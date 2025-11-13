@@ -1,0 +1,16 @@
+com\example\sipclient\sip\SipUserAgent.class
+com\example\sipclient\chat\ChatSession.class
+com\example\sipclient\ui\ConsoleUI.class
+com\example\sipclient\media\AudioSession.class
+com\example\sipclient\SipClientApplication.class
+com\example\sipclient\ui\ConsoleMain.class
+com\example\sipclient\ui\ConsoleMain$1.class
+com\example\sipclient\sip\SipUserAgent$1.class
+com\example\sipclient\call\CallSession.class
+com\example\sipclient\call\CallManager.class
+com\example\sipclient\chat\MessageHandler.class
+com\example\sipclient\call\CallSession$State.class
+com\example\sipclient\chat\GroupChatService.class
+com\example\sipclient\config\SipConfig.class
+com\example\sipclient\config\SipConfig$Builder.class
+com\example\sipclient\media\MediaSession.class

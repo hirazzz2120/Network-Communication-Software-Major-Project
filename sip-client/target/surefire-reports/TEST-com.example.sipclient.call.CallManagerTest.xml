@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="com.example.sipclient.call.CallManagerTest" time="1.06" tests="2" errors="0" skipped="0" failures="0">
+  <properties>
+    <property name="java.specification.version" value="17"/>
+    <property name="sun.cpu.isalist" value="amd64"/>
+    <property name="sun.jnu.encoding" value="GBK"/>
+    <property name="java.class.path" value="C:\Users\22712\.m2\repository\org\apache\maven\surefire\surefire-api\3.1.2\surefire-api-3.1.2.jar;C:\Users\22712\.m2\repository\org\apache\maven\surefire\surefire-booter\3.1.2\surefire-booter-3.1.2.jar;C:\Users\22712\.m2\repository\org\apache\maven\surefire\surefire-extensions-spi\3.1.2\surefire-extensions-spi-3.1.2.jar;C:\Users\22712\.m2\repository\org\apache\maven\surefire\surefire-logger-api\3.1.2\surefire-logger-api-3.1.2.jar;C:\Users\22712\.m2\repository\org\apache\maven\surefire\surefire-shared-utils\3.1.2\surefire-shared-utils-3.1.2.jar;D:\net_communication\projects\Project\sip-client\target\test-classes;D:\net_communication\projects\Project\sip-client\target\classes;C:\Users\22712\.m2\repository\javax\sip\jain-sip-ri\1.3.0-91\jain-sip-ri-1.3.0-91.jar;C:\Users\22712\.m2\repository\org\slf4j\slf4j-api\2.0.12\slf4j-api-2.0.12.jar;C:\Users\22712\.m2\repository\ch\qos\logback\logback-classic\1.5.6\logback-classic-1.5.6.jar;C:\Users\22712\.m2\repository\ch\qos\logback\logback-core\1.5.6\logback-core-1.5.6.jar;C:\Users\22712\.m2\repository\org\junit\jupiter\junit-jupiter\5.10.2\junit-jupiter-5.10.2.jar;C:\Users\22712\.m2\repository\org\junit\jupiter\junit-jupiter-api\5.10.2\junit-jupiter-api-5.10.2.jar;C:\Users\22712\.m2\repository\org\opentest4j\opentest4j\1.3.0\opentest4j-1.3.0.jar;C:\Users\22712\.m2\repository\org\junit\platform\junit-platform-commons\1.10.2\junit-platform-commons-1.10.2.jar;C:\Users\22712\.m2\repository\org\apiguardian\apiguardian-api\1.1.2\apiguardian-api-1.1.2.jar;C:\Users\22712\.m2\repository\org\junit\jupiter\junit-jupiter-params\5.10.2\junit-jupiter-params-5.10.2.jar;C:\Users\22712\.m2\repository\org\junit\jupiter\junit-jupiter-engine\5.10.2\junit-jupiter-engine-5.10.2.jar;C:\Users\22712\.m2\repository\org\junit\platform\junit-platform-engine\1.10.2\junit-platform-engine-1.10.2.jar;C:\Users\22712\.m2\repository\org\mockito\mockito-core\5.11.0\mockito-core-5.11.0.jar;C:\Users\22712\.m2\repository\net\bytebuddy\byte-buddy\1.14.13\byte-buddy-1.14.13.jar;C:\Users\22712\.m2\repository\net\bytebuddy\byte-buddy-agent\1.14.13\byte-buddy-agent-1.14.13.jar;C:\Users\22712\.m2\repository\org\objenesis\objenesis\3.3\objenesis-3.3.jar;C:\Users\22712\.m2\repository\org\apache\maven\surefire\surefire-junit-platform\3.1.2\surefire-junit-platform-3.1.2.jar;C:\Users\22712\.m2\repository\org\apache\maven\surefire\common-java5\3.1.2\common-java5-3.1.2.jar;C:\Users\22712\.m2\repository\org\junit\platform\junit-platform-launcher\1.10.2\junit-platform-launcher-1.10.2.jar"/>
+    <property name="java.vm.vendor" value="Eclipse Adoptium"/>
+    <property name="sun.arch.data.model" value="64"/>
+    <property name="user.variant" value=""/>
+    <property name="java.vendor.url" value="https://adoptium.net/"/>
+    <property name="user.timezone" value="Asia/Shanghai"/>
+    <property name="os.name" value="Windows 11"/>
+    <property name="java.vm.specification.version" value="17"/>
+    <property name="sun.java.launcher" value="SUN_STANDARD"/>
+    <property name="user.country" value="CN"/>
+    <property name="sun.boot.library.path" value="D:\JAVA\JDK-17\bin"/>
+    <property name="sun.java.command" value="org.apache.maven.surefire.booter.ForkedBooter C:\Users\22712\AppData\Local\Temp\surefire11476591443879423386 2025-11-13T20-51-46_084-jvmRun1 surefire-20251113205146285_1tmp surefire_0-20251113205146285_2tmp"/>
+    <property name="jdk.debug" value="release"/>
+    <property name="surefire.test.class.path" value="D:\net_communication\projects\Project\sip-client\target\test-classes;D:\net_communication\projects\Project\sip-client\target\classes;C:\Users\22712\.m2\repository\javax\sip\jain-sip-ri\1.3.0-91\jain-sip-ri-1.3.0-91.jar;C:\Users\22712\.m2\repository\org\slf4j\slf4j-api\2.0.12\slf4j-api-2.0.12.jar;C:\Users\22712\.m2\repository\ch\qos\logback\logback-classic\1.5.6\logback-classic-1.5.6.jar;C:\Users\22712\.m2\repository\ch\qos\logback\logback-core\1.5.6\logback-core-1.5.6.jar;C:\Users\22712\.m2\repository\org\junit\jupiter\junit-jupiter\5.10.2\junit-jupiter-5.10.2.jar;C:\Users\22712\.m2\repository\org\junit\jupiter\junit-jupiter-api\5.10.2\junit-jupiter-api-5.10.2.jar;C:\Users\22712\.m2\repository\org\opentest4j\opentest4j\1.3.0\opentest4j-1.3.0.jar;C:\Users\22712\.m2\repository\org\junit\platform\junit-platform-commons\1.10.2\junit-platform-commons-1.10.2.jar;C:\Users\22712\.m2\repository\org\apiguardian\apiguardian-api\1.1.2\apiguardian-api-1.1.2.jar;C:\Users\22712\.m2\repository\org\junit\jupiter\junit-jupiter-params\5.10.2\junit-jupiter-params-5.10.2.jar;C:\Users\22712\.m2\repository\org\junit\jupiter\junit-jupiter-engine\5.10.2\junit-jupiter-engine-5.10.2.jar;C:\Users\22712\.m2\repository\org\junit\platform\junit-platform-engine\1.10.2\junit-platform-engine-1.10.2.jar;C:\Users\22712\.m2\repository\org\mockito\mockito-core\5.11.0\mockito-core-5.11.0.jar;C:\Users\22712\.m2\repository\net\bytebuddy\byte-buddy\1.14.13\byte-buddy-1.14.13.jar;C:\Users\22712\.m2\repository\net\bytebuddy\byte-buddy-agent\1.14.13\byte-buddy-agent-1.14.13.jar;C:\Users\22712\.m2\repository\org\objenesis\objenesis\3.3\objenesis-3.3.jar;"/>
+    <property name="sun.cpu.endian" value="little"/>
+    <property name="user.home" value="C:\Users\22712"/>
+    <property name="user.language" value="zh"/>
+    <property name="java.specification.vendor" value="Oracle Corporation"/>
+    <property name="java.version.date" value="2025-10-21"/>
+    <property name="java.home" value="D:\JAVA\JDK-17"/>
+    <property name="file.separator" value="\"/>
+    <property name="basedir" value="D:\net_communication\projects\Project\sip-client"/>
+    <property name="java.vm.compressedOopsMode" value="Zero based"/>
+    <property name="line.separator" value="&#10;"/>
+    <property name="java.vm.specification.vendor" value="Oracle Corporation"/>
+    <property name="java.specification.name" value="Java Platform API Specification"/>
+    <property name="user.script" value=""/>
+    <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
+    <property name="java.runtime.version" value="17.0.17+10"/>
+    <property name="user.name" value="22712"/>
+    <property name="path.separator" value=";"/>
+    <property name="os.version" value="10.0"/>
+    <property name="java.runtime.name" value="OpenJDK Runtime Environment"/>
+    <property name="file.encoding" value="GBK"/>
+    <property name="java.vm.name" value="OpenJDK 64-Bit Server VM"/>
+    <property name="java.vendor.version" value="Temurin-17.0.17+10"/>
+    <property name="localRepository" value="C:\Users\22712\.m2\repository"/>
+    <property name="java.vendor.url.bug" value="https://github.com/adoptium/adoptium-support/issues"/>
+    <property name="java.io.tmpdir" value="C:\Users\22712\AppData\Local\Temp\"/>
+    <property name="java.version" value="17.0.17"/>
+    <property name="user.dir" value="D:\net_communication\projects\Project\sip-client"/>
+    <property name="os.arch" value="amd64"/>
+    <property name="java.vm.specification.name" value="Java Virtual Machine Specification"/>
+    <property name="sun.os.patch.level" value=""/>
+    <property name="native.encoding" value="GBK"/>
+    <property name="java.library.path" value="D:\JAVA\JDK-17\bin;C:\WINDOWS\Sun\Java\bin;C:\WINDOWS\system32;C:\WINDOWS;C:\Program Files\PowerShell\7;c:\Users\22712\AppData\Roaming\Code\User\globalStorage\github.copilot-chat\debugCommand;c:\Users\22712\AppData\Roaming\Code\User\globalStorage\github.copilot-chat\copilotCli;E:\VMware\bin\;C:\Program Files (x86)\Common Files\Intel\Shared Libraries\redist\intel64\compiler;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Windows\System32\OpenSSH\;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files\Microsoft SQL Server\150\Tools\Binn\;C:\Program Files\dotnet\;E:\weixinxiaochengxu\微信web开发者工具\dll;E:\zip;Bandizip\;C:\Program Files\NVIDIA Corporation\NVIDIA app\NvDLISR;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\WINDOWS\System32\OpenSSH\;D:\GitHub CLI\;C:\Program Files\Docker\Docker\resources\bin;C:\Program Files (x86)\Windows Kits\10\Windows Performance Toolkit\;C:\Program Files\Microsoft Network Monitor 3\;C:\Program Files\PowerShell\7\;D:\Git\Git\cmd;D:\Maven\apache-maven-3.9.11\bin;C:\Program Files\nodejs\;D:\JAVA\JDK-17\bin;D:\PYTHON\Python312\Scripts\;D:\PYTHON\Python312\;C:\Users\22712\AppData\Local\Microsoft\WindowsApps;C:\Program Files (x86)\Tencent\QQGameTempest\Hall.57986\;E:\Cursor\cursor\resources\app\bin;D:\VScode\Microsoft VS Code\bin;C:\Users\22712\AppData\Roaming\npm;c:\Users\22712\.vscode\extensions\vscjava.vscode-java-debug-0.58.3\bundled\scripts\noConfigScripts;."/>
+    <property name="java.vm.info" value="mixed mode, sharing"/>
+    <property name="java.vendor" value="Eclipse Adoptium"/>
+    <property name="java.vm.version" value="17.0.17+10"/>
+    <property name="java.specification.maintenance.version" value="1"/>
+    <property name="sun.io.unicode.encoding" value="UnicodeLittle"/>
+    <property name="java.class.version" value="61.0"/>
+  </properties>
+  <testcase name="lifecycleFromOutgoingToTerminate" classname="com.example.sipclient.call.CallManagerTest" time="1.028">
+    <system-out><![CDATA[20:51:46.859 [main] INFO com.example.sipclient.call.CallManager -- 已发起到 sip:bob@example.com 的呼叫，sessionId=31964264-cbd1-4b56-bd4c-9f4d23311cc0
+20:51:47.698 [main] DEBUG com.example.sipclient.call.CallManager -- Session 31964264-cbd1-4b56-bd4c-9f4d23311cc0 bound to dialog Mock for Dialog, hashCode: 32496853
+20:51:47.742 [main] INFO com.example.sipclient.call.CallManager -- 呼叫 31964264-cbd1-4b56-bd4c-9f4d23311cc0 已建立媒体通道
+20:51:47.744 [main] INFO com.example.sipclient.call.CallManager -- 呼叫 31964264-cbd1-4b56-bd4c-9f4d23311cc0 已结束
+]]></system-out>
+  </testcase>
+  <testcase name="lifecycleForIncomingCall" classname="com.example.sipclient.call.CallManagerTest" time="0.005">
+    <system-out><![CDATA[20:51:47.783 [main] INFO com.example.sipclient.call.CallManager -- 收到来自 sip:alice@example.com 的来电，sessionId=4ea23366-9fa4-449c-bd47-408ddbfbf1a7
+20:51:47.784 [main] INFO com.example.sipclient.media.AudioSession -- 音频会话启动（示例实现，仅日志）
+20:51:47.784 [main] INFO com.example.sipclient.call.CallManager -- 呼叫 4ea23366-9fa4-449c-bd47-408ddbfbf1a7 已建立媒体通道
+20:51:47.785 [main] INFO com.example.sipclient.media.AudioSession -- 音频会话结束
+20:51:47.785 [main] INFO com.example.sipclient.call.CallManager -- 呼叫 4ea23366-9fa4-449c-bd47-408ddbfbf1a7 已结束
+]]></system-out>
+  </testcase>
+</testsuite>

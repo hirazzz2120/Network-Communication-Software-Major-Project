@@ -12,7 +12,6 @@ import javax.sip.ClientTransaction;
 import javax.sip.Dialog;
 import javax.sip.IOExceptionEvent;
 import javax.sip.ListeningPoint;
-import javax.sip.ObjectInUseException;
 import javax.sip.RequestEvent;
 import javax.sip.ResponseEvent;
 import javax.sip.ServerTransaction;
@@ -23,7 +22,6 @@ import javax.sip.SipProvider;
 import javax.sip.SipStack;
 import javax.sip.TimeoutEvent;
 import javax.sip.TransactionTerminatedEvent;
-import javax.sip.ViaHeader;
 import javax.sip.address.Address;
 import javax.sip.address.AddressFactory;
 import javax.sip.address.SipURI;
@@ -38,6 +36,7 @@ import javax.sip.header.HeaderFactory;
 import javax.sip.header.MaxForwardsHeader;
 import javax.sip.header.ToHeader;
 import javax.sip.header.UserAgentHeader;
+import javax.sip.header.ViaHeader;
 import javax.sip.message.MessageFactory;
 import javax.sip.message.Request;
 import javax.sip.message.Response;
@@ -133,7 +132,7 @@ public final class SipUserAgent implements SipListener {
 
         this.contactHeader = buildContactHeader(localIp, localPort);
 
-        AccountManager accountManager = () -> new UserCredentials() {
+        AccountManager accountManager = (ClientTransaction ct, String realm) -> new UserCredentials() {
             @Override
             public String getUserName() {
                 return username;
@@ -188,18 +187,14 @@ public final class SipUserAgent implements SipListener {
      * Shuts down the SIP stack and releases sockets.
      */
     public void shutdown() {
-        try {
-            sipProvider.removeSipListener(this);
-        } catch (ObjectInUseException ignored) {
-            // Safe to ignore because we are disposing the stack entirely.
-        }
+        sipProvider.removeSipListener(this);
         try {
             sipStack.deleteSipProvider(sipProvider);
-        } catch (ObjectInUseException ignored) {
+        } catch (Exception ignored) {
         }
         try {
             sipStack.deleteListeningPoint(listeningPoint);
-        } catch (ObjectInUseException ignored) {
+        } catch (Exception ignored) {
         }
         sipStack.stop();
     }
@@ -243,7 +238,7 @@ public final class SipUserAgent implements SipListener {
 
             ClientTransaction transaction = sipProvider.getNewClientTransaction(request);
             transaction.sendRequest();
-        } catch (ParseException ex) {
+        } catch (ParseException | javax.sip.InvalidArgumentException ex) {
             throw new IllegalArgumentException("目标 URI 不合法", ex);
         }
     }
@@ -257,7 +252,7 @@ public final class SipUserAgent implements SipListener {
             }
             ClientTransaction transaction = sipProvider.getNewClientTransaction(invite);
             transaction.sendRequest();
-        } catch (ParseException ex) {
+        } catch (ParseException | javax.sip.InvalidArgumentException ex) {
             throw new IllegalArgumentException("目标 URI 不合法", ex);
         }
     }
@@ -337,12 +332,12 @@ public final class SipUserAgent implements SipListener {
             request.addHeader(userAgentHeader);
 
             return request;
-        } catch (ParseException | SipException ex) {
+        } catch (ParseException | javax.sip.InvalidArgumentException ex) {
             throw new IllegalStateException("Failed to build REGISTER request", ex);
         }
     }
 
-    private Request createInviteRequest(String targetUri) throws ParseException, SipException {
+    private Request createInviteRequest(String targetUri) throws ParseException, SipException, javax.sip.InvalidArgumentException {
         SipURI requestUri = (SipURI) addressFactory.createURI(targetUri);
 
         SipURI fromUri = addressFactory.createSipURI(username, registrarHost);
@@ -485,7 +480,7 @@ public final class SipUserAgent implements SipListener {
         return normalizeUri(toHeader.getAddress().getURI());
     }
 
-    private ContactHeader buildContactHeader(String localIp, int localPort) throws ParseException {
+    private ContactHeader buildContactHeader(String localIp, int localPort) throws ParseException, javax.sip.InvalidArgumentException {
         SipURI contactUri = addressFactory.createSipURI(username, localIp);
         contactUri.setPort(localPort);
         contactUri.setTransportParam(transport);
@@ -612,7 +607,7 @@ public final class SipUserAgent implements SipListener {
                 try {
                     Request ack = dialog.createAck(((CSeqHeader) response.getHeader(CSeqHeader.NAME)).getSeqNumber());
                     dialog.sendAck(ack);
-                } catch (SipException ex) {
+                } catch (SipException | javax.sip.InvalidArgumentException ex) {
                     System.err.println("Failed to send ACK: " + ex.getMessage());
                 }
             }

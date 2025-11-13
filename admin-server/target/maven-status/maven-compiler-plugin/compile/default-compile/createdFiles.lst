@@ -1,0 +1,15 @@
+com\example\admin\controller\DashboardStreamController.class
+com\example\admin\service\StatsService.class
+com\example\admin\controller\UserController.class
+com\example\admin\AdminServerApplication.class
+com\example\admin\controller\CallRecordController.class
+com\example\admin\controller\StatsController.class
+com\example\admin\repository\InMemoryStore.class
+com\example\admin\controller\DashboardController.class
+com\example\admin\service\CallRecordService.class
+com\example\admin\entity\UserSummary.class
+com\example\admin\entity\CallRecord.class
+com\example\admin\service\DashboardSnapshotService.class
+com\example\admin\service\UserService.class
+com\example\admin\entity\DashboardSnapshot.class
+com\example\admin\entity\StatsSummary.class
