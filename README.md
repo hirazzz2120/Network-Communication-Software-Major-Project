@@ -18,6 +18,10 @@
 | SIP 协议栈 | JAIN SIP (jain-sip-ri) | 1.3.0-91 |
 | SIP 服务器 | MSS (Mobicents) | - |
 | 后端框架 | Spring Boot | 3.2.5 |
+| 前端框架 | React + TypeScript | 18.2 / 5.2 ⭐ |
+| 前端构建 | Vite | 5.0 ⭐ |
+| UI 组件库 | Ant Design | 5.12 ⭐ |
+| 状态管理 | Zustand | 4.4 ⭐ |
 | 日志框架 | SLF4J + Logback | 2.0.12 / 1.5.6 |
 | 测试框架 | JUnit 5 + Mockito | 5.10.2 / 5.11.0 |
 
@@ -44,11 +48,25 @@ Project/
 │   │       ├── entity/        # 数据模型（DTO）
 │   │       └── repository/    # 数据访问层（当前为内存存储）
 │   └── pom.xml
+├── web-frontend/              # Web 前端模块（React + TypeScript）⭐ 新增
+│   ├── src/
+│   │   ├── api/               # API 请求封装
+│   │   ├── components/        # React 组件
+│   │   ├── pages/             # 页面组件
+│   │   ├── stores/            # 状态管理（Zustand）
+│   │   ├── services/          # 业务服务（WebSocket）
+│   │   └── types/             # TypeScript 类型定义
+│   ├── package.json
+│   └── README.md
 ├── docs/
 │   ├── guidance.md            # 开发指导文档（SRS）
 │   └── requirements-week2.md  # 第2周需求说明
+├── API-SPECIFICATION.md       # 前后端 API 接口规范 ⭐ 新增
+├── HANDOVER.md                # 项目交接文档（给组员）⭐ 新增
+├── WEB-QUICKSTART.md          # Web 前端快速启动 ⭐ 新增
 ├── QUICKSTART.md              # 快速测试指南
-└── run-sip-client.ps1         # PowerShell 启动脚本
+├── run-sip-client.ps1         # PowerShell 启动脚本
+└── start-web.ps1              # Web 前端一键启动 ⭐ 新增
 ```
 
 ## 当前功能状态
@@ -85,6 +103,8 @@ Project/
 
 ## 快速开始
 
+> 💡 **组员快速上手**：如果你刚加入项目，请先阅读 [`HANDOVER.md`](HANDOVER.md) 获取完整的交接指南！
+
 ### 环境准备
 
 1. **JDK 17**
@@ -97,7 +117,13 @@ Project/
    mvn -v  # 确认 Maven 版本
    ```
 
-3. **MSS 服务器**（可选，用于真实 SIP 注册测试）
+3. **Node.js 18+**（用于 Web 前端）⭐
+   ```powershell
+   node -v  # 确认版本 >= 18
+   npm -v   # 确认 npm 可用
+   ```
+
+4. **MSS 服务器**（可选，用于真实 SIP 注册测试）
    - 下载并启动 Mobicents SIP Servlets
    - 或使用公网测试 SIP 服务器（如 sip2sip.info）
 
@@ -157,7 +183,28 @@ curl http://localhost:8081/api/users
 curl http://localhost:8081/api/stats
 ```
 
-### 方式 3：打包后运行
+### 方式 3：Web 前端（推荐用于演示）⭐
+
+> 💡 **详细教程**：查看 [`WEB-QUICKSTART.md`](WEB-QUICKSTART.md) 或使用一键启动脚本 `.\start-web.ps1`
+
+#### 第一步：启动后端服务器
+
+```powershell
+cd admin-server
+mvn spring-boot:run
+```
+
+#### 第二步：启动 Web 前端
+
+```powershell
+cd web-frontend
+npm install  # 首次运行需要安装依赖
+npm run dev
+```
+
+访问 http://localhost:3000 使用 Web 界面。
+
+### 方式 4：打包后运行
 
 ```powershell
 # 编译打包
@@ -197,29 +244,38 @@ java -jar admin-server/target/admin-server-1.0.0-SNAPSHOT.jar
   - `CallSession.java` - 呼叫状态机（RINGING/ACTIVE/TERMINATED）
   - 前端需要显示来电弹窗、通话界面、呼叫状态
 
-#### 与后端的 API 约定（建议）
+#### 与后端的 API 约定
 
-前端通过 REST API 与后端通信，推荐的 API 设计：
+**⭐ 完整的 API 接口规范请查看 `API-SPECIFICATION.md`**
+
+主要接口概览：
 
 **认证与用户**
-- `POST /api/login` - 登录（返回 token）
-- `GET /api/users` - 获取用户/联系人列表
-- `GET /api/profile` - 获取当前用户信息
+- `POST /api/auth/login` - 登录（SIP 注册）
+- `POST /api/auth/logout` - 注销
+- `GET /api/auth/profile` - 获取当前用户信息
+- `PUT /api/auth/status` - 更新用户状态
 
 **消息**
 - `POST /api/messages` - 发送消息
-- `GET /api/messages?sessionId={id}` - 获取会话历史
-- `WebSocket /ws/messages` - 实时消息推送
+- `GET /api/messages/sessions` - 获取会话列表
+- `GET /api/messages/sessions/{sessionId}` - 获取会话历史
+- `PUT /api/messages/{messageId}/read` - 标记已读
 
 **呼叫**
-- `POST /api/call/start` - 发起呼叫
-- `POST /api/call/answer` - 接听呼叫
-- `POST /api/call/hangup` - 挂断呼叫
-- `WebSocket /ws/calls` - 实时呼叫事件（来电、状态变化）
+- `POST /api/calls` - 发起呼叫
+- `PUT /api/calls/{callId}/answer` - 接听呼叫
+- `PUT /api/calls/{callId}/reject` - 拒绝呼叫
+- `DELETE /api/calls/{callId}` - 挂断呼叫
+- `GET /api/calls/history` - 获取通话历史
 
-**配置**
-- `GET /api/config` - 获取 SIP 配置
-- `PUT /api/config` - 更新 SIP 配置
+**联系人**
+- `GET /api/users` - 获取用户列表
+- `GET /api/users/{userId}` - 获取用户详情
+
+**WebSocket 实时事件**
+- `ws://localhost:8081/ws/events?token={jwt}` - WebSocket 连接
+- 事件类型：MESSAGE_RECEIVED, INCOMING_CALL, CALL_STATE_CHANGED, USER_STATUS_CHANGED 等
 
 #### 推荐的前端技术栈
 - **Web 前端**：React/Vue + WebRTC（用于媒体流）+ Axios（HTTP）+ WebSocket
@@ -343,6 +399,13 @@ mvn -pl admin-server test
 
 ## 文档索引
 
+### 🚀 团队协作必读
+- **`HANDOVER.md`** ⭐⭐⭐⭐⭐ - **项目交接文档**（给组员的快速上手指南）
+- **`API-SPECIFICATION.md`** ⭐⭐⭐⭐⭐ - **前后端 API 接口规范**（前后端开发必读）
+- **`web-frontend/README.md`** ⭐⭐⭐⭐⭐ - Web 前端开发文档
+- **`WEB-QUICKSTART.md`** ⭐⭐⭐⭐ - Web 前端快速启动教程
+
+### 📚 开发与测试
 - **`QUICKSTART.md`** - 快速测试指南（命令、参数、故障排查）
 - **`docs/guidance.md`** - 完整的软件需求规格说明（SRS）
 - **`docs/requirements-week2.md`** - 第2周需求说明与进度规划
