@@ -48,7 +48,7 @@ Project/
 │   │       ├── entity/        # 数据模型（DTO）
 │   │       └── repository/    # 数据访问层（当前为内存存储）
 │   └── pom.xml
-├── web-frontend/              # Web 前端模块（React + TypeScript）⭐ 新增
+├── web-frontend/              # Web 前端模块（React + TypeScript）
 │   ├── src/
 │   │   ├── api/               # API 请求封装
 │   │   ├── components/        # React 组件
@@ -59,14 +59,12 @@ Project/
 │   ├── package.json
 │   └── README.md
 ├── docs/
-│   ├── guidance.md            # 开发指导文档（SRS）
-│   └── requirements-week2.md  # 第2周需求说明
-├── API-SPECIFICATION.md       # 前后端 API 接口规范 ⭐ 新增
-├── HANDOVER.md                # 项目交接文档（给组员）⭐ 新增
-├── WEB-QUICKSTART.md          # Web 前端快速启动 ⭐ 新增
+│   └── guidance.md            # 开发指导文档（SRS）
+├── API-SPECIFICATION.md       # 前后端 API 接口规范
+├── WEB-QUICKSTART.md          # Web 前端快速启动
 ├── QUICKSTART.md              # 快速测试指南
 ├── run-sip-client.ps1         # PowerShell 启动脚本
-└── start-web.ps1              # Web 前端一键启动 ⭐ 新增
+└── start-web.ps1              # Web 前端一键启动
 ```
 
 ## 当前功能状态
@@ -103,118 +101,28 @@ Project/
 
 ## 快速开始
 
-> 💡 **组员快速上手**：如果你刚加入项目，请先阅读 [`HANDOVER.md`](HANDOVER.md) 获取完整的交接指南！
+### 方式 1：Web 前端（推荐）
 
-### 环境准备
+> 💡 **详细教程**：查看 [`WEB-QUICKSTART.md`](WEB-QUICKSTART.md)
 
-1. **JDK 17**
+1. **启动后端**：
    ```powershell
-   java -version  # 确认输出 "17.x.x"
+   cd admin-server
+   mvn spring-boot:run
    ```
-
-2. **Maven 3.x**
+2. **启动前端**（新开终端）：
    ```powershell
-   mvn -v  # 确认 Maven 版本
+   .\start-web.ps1
    ```
+   访问 http://localhost:3000
 
-3. **Node.js 18+**（用于 Web 前端）⭐
-   ```powershell
-   node -v  # 确认版本 >= 18
-   npm -v   # 确认 npm 可用
-   ```
+### 方式 2：命令行客户端
 
-4. **MSS 服务器**（可选，用于真实 SIP 注册测试）
-   - 下载并启动 Mobicents SIP Servlets
-   - 或使用公网测试 SIP 服务器（如 sip2sip.info）
+> 💡 **详细教程**：查看 [`QUICKSTART.md`](QUICKSTART.md)
 
-### 方式 1：一键启动（推荐）
-
-使用 PowerShell 脚本快速启动 SIP 客户端：
-
+使用一键脚本启动：
 ```powershell
 .\run-sip-client.ps1
-```
-
-脚本会自动检查环境并启动命令行界面。
-
-### 方式 2：手动启动
-
-#### 启动 SIP 客户端（命令行模式）
-
-```powershell
-mvn -pl sip-client exec:java "-Dexec.mainClass=com.example.sipclient.ui.ConsoleMain" "-Dexec.cleanupDaemonThreads=false"
-```
-
-**交互流程：**
-1. 输入 SIP URI（例：`sip:alice@192.168.1.100:5060`）
-2. 输入密码
-3. 输入本地 IP（用于接收 SIP 消息的地址）
-4. 输入本地端口（例：`5070`）
-5. 等待注册完成
-6. 使用命令菜单进行操作
-
-**可用命令：**
-- `help` - 显示帮助
-- `msg <sip:target@host> <消息内容>` - 发送消息
-- `call <sip:target@host>` - 发起语音呼叫
-- `hangup <sip:target@host>` - 挂断呼叫
-- `unregister` - 注销登录
-- `exit` - 退出程序
-
-#### 启动后台管理服务器
-
-```powershell
-cd admin-server
-mvn spring-boot:run
-```
-
-服务器默认运行在 `http://localhost:8081`
-
-**可用接口：**
-- `GET /api/users` - 查询用户列表及在线状态
-- `GET /api/calls` - 查看通话记录
-- `GET /api/stats` - 查看统计数据
-- `GET /api/dashboard` - 获取仪表盘快照
-- `GET /stream/dashboard` - SSE 实时推送（未完全实现）
-
-示例：
-```powershell
-curl http://localhost:8081/api/users
-curl http://localhost:8081/api/stats
-```
-
-### 方式 3：Web 前端（推荐用于演示）⭐
-
-> 💡 **详细教程**：查看 [`WEB-QUICKSTART.md`](WEB-QUICKSTART.md) 或使用一键启动脚本 `.\start-web.ps1`
-
-#### 第一步：启动后端服务器
-
-```powershell
-cd admin-server
-mvn spring-boot:run
-```
-
-#### 第二步：启动 Web 前端
-
-```powershell
-cd web-frontend
-npm install  # 首次运行需要安装依赖
-npm run dev
-```
-
-访问 http://localhost:3000 使用 Web 界面。
-
-### 方式 4：打包后运行
-
-```powershell
-# 编译打包
-mvn clean package
-
-# 运行 SIP 客户端
-java -cp sip-client/target/sip-client-1.0.0-SNAPSHOT.jar com.example.sipclient.ui.ConsoleMain
-
-# 运行后台服务器
-java -jar admin-server/target/admin-server-1.0.0-SNAPSHOT.jar
 ```
 
 ---
@@ -374,15 +282,15 @@ mvn -pl admin-server test
 
 ## 开发路线图
 
-### 第 2-3 周（当前）
+### 第 2-3 周（已完成）
 - [x] 完善 SIP 注册与消息功能
 - [x] 完成呼叫信令流程
-- [ ] 设计并约定前后端 API 接口
-- [ ] 前端选型与项目初始化
+- [x] 设计并约定前后端 API 接口
+- [x] 前端选型与项目初始化
 
-### 第 4 周
-- [ ] 实现真实音频采集与播放（Java Sound）
-- [ ] 前端实现登录、联系人、聊天界面
+### 第 4 周（当前）
+- [ ] 实现真实音频采集与播放（Java Sound / WebRTC）
+- [x] 前端实现登录、联系人、聊天界面
 - [ ] 后端实现 JWT 认证与 WebSocket 推送
 
 ### 第 5 周
@@ -399,16 +307,14 @@ mvn -pl admin-server test
 
 ## 文档索引
 
-### 🚀 团队协作必读
-- **`HANDOVER.md`** ⭐⭐⭐⭐⭐ - **项目交接文档**（给组员的快速上手指南）
+### 🚀 核心文档
 - **`API-SPECIFICATION.md`** ⭐⭐⭐⭐⭐ - **前后端 API 接口规范**（前后端开发必读）
 - **`web-frontend/README.md`** ⭐⭐⭐⭐⭐ - Web 前端开发文档
 - **`WEB-QUICKSTART.md`** ⭐⭐⭐⭐ - Web 前端快速启动教程
+- **`QUICKSTART.md`** - 命令行客户端测试指南
 
-### 📚 开发与测试
-- **`QUICKSTART.md`** - 快速测试指南（命令、参数、故障排查）
-- **`docs/guidance.md`** - 完整的软件需求规格说明（SRS）
-- **`docs/requirements-week2.md`** - 第2周需求说明与进度规划
+### 📚 需求与指导
+- **`docs/guidance.md`** - 软件需求规格说明（SRS）
 
 ---
 
@@ -476,6 +382,45 @@ mvn clean package
 - 团队成员 2 - 后端开发  
 - 团队成员 3 - SIP 协议与媒体
 - 团队成员 4 - 测试与文档
+
+---
+
+## 🎯 开发任务清单
+
+### 前端开发者任务 (Web)
+
+#### 已完成 ✅
+- [x] React + TypeScript 项目初始化
+- [x] Ant Design UI 组件库集成
+- [x] Zustand 状态管理
+- [x] Axios API 请求封装
+- [x] WebSocket 客户端封装
+- [x] 登录页面（`LoginPage.tsx`）
+- [x] 主页面布局（`MainPage.tsx`）
+- [x] 聊天页面（`ChatPage.tsx`）
+- [x] 联系人页面（`ContactsPage.tsx`）
+
+#### 待开发 🔄
+- [ ] **WebRTC 音频通话功能**（通话页面占位中）
+- [ ] **消息状态更新**（已读/未读状态同步）
+- [ ] **文件上传**（图片、文件消息）
+- [ ] **群聊功能**
+
+### 后端开发者任务 (Java)
+
+#### 已完成 ✅
+- [x] Spring Boot 项目结构
+- [x] Controller 骨架（`UserController`, `StatsController` 等）
+- [x] 内存数据存储（`InMemoryStore`）
+- [x] SIP 协议实现（`SipUserAgent`）
+- [x] 呼叫管理（`CallManager`）
+- [x] 消息处理（`MessageHandler`）
+
+#### 待实现 🔄
+- [ ] **实现认证 API** (`/api/auth/login`)
+- [ ] **实现 WebSocket 实时推送**
+- [ ] **数据持久化** (MySQL/JPA)
+- [ ] **实现 SIP-WebRTC 网关** (或集成 Janus)
 
 ---
 
