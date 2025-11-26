@@ -7,22 +7,24 @@
 <BorderPane xmlns="http://javafx.com/javafx"
             xmlns:fx="http://javafx.com/fxml"
             fx:controller="com.example.sipclient.gui.controller.MainController"
-            prefWidth="900" prefHeight="600">
+            prefWidth="900" prefHeight="600"
+            stylesheets="@../css/style.css"
+            styleClass="root">
 
     <!-- 左侧联系人列表 -->
     <left>
-        <VBox style="-fx-background-color: #f0f2f5;" prefWidth="280">
+        <VBox styleClass="sidebar" prefWidth="280">
             <!-- 标题栏和工具栏 -->
             <VBox style="-fx-background-color: white; -fx-padding: 15;" spacing="10">
                 <HBox alignment="CENTER_LEFT" spacing="10">
-                    <Label text="联系人" style="-fx-font-size: 18px; -fx-font-weight: bold;"/>
+                    <Label text="联系人" styleClass="header-label"/>
                     <Region HBox.hgrow="ALWAYS"/>
                     <Button text="➕" onAction="#handleAddContact" 
-                           style="-fx-background-color: #4caf50; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 5 10;"/>
+                           styleClass="button, success-button, icon-button"/>
                     <Button text="⚙" onAction="#handleOpenSettings"
-                           style="-fx-background-color: #2196f3; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 5 10;"/>
+                           styleClass="button, icon-button"/>
                     <Button text="🚪" onAction="#handleLogout"
-                           style="-fx-background-color: #f44336; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 5 10;">
+                           styleClass="button, danger-button, icon-button">
                         <tooltip>
                             <Tooltip text="注销"/>
                         </tooltip>
@@ -30,50 +32,49 @@
                 </HBox>
                 <!-- 搜索框 -->
                 <TextField fx:id="searchField" promptText="搜索联系人或消息..."
-                          style="-fx-background-color: #f0f2f5; -fx-border-color: transparent; -fx-background-radius: 15; -fx-padding: 8;"/>
+                          style="-fx-background-radius: 15;"/>
             </VBox>
             <Separator/>
             <ListView fx:id="contactListView" VBox.vgrow="ALWAYS"
-                     style="-fx-background-color: #f0f2f5; -fx-border-width: 0;"/>
+                     styleClass="list-view"/>
         </VBox>
     </left>
 
     <!-- 中间聊天区域 -->
     <center>
-        <VBox>
+        <VBox styleClass="chat-area">
             <!-- 聊天标题栏 -->
-            <HBox alignment="CENTER_LEFT" spacing="10" style="-fx-background-color: white; -fx-padding: 15;">
+            <HBox alignment="CENTER_LEFT" spacing="10" style="-fx-background-color: white; -fx-padding: 15; -fx-border-color: #dee2e6; -fx-border-width: 0 0 1 0;">
                 <Label fx:id="chatTitleLabel" text="选择联系人开始聊天"
-                       style="-fx-font-size: 16px; -fx-font-weight: bold;"/>
+                       styleClass="header-label"/>
                 <Region HBox.hgrow="ALWAYS"/>
                 <Button text="🔍" onAction="#handleSearchMessage" 
-                       style="-fx-background-color: #ff9800; -fx-text-fill: white; -fx-padding: 8 15 8 15; -fx-background-radius: 5;"/>
+                       styleClass="button, warning-button"/>
                 <Button fx:id="callButton" text="📞 语音通话" onAction="#handleMakeCall"
-                       style="-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-padding: 8 15 8 15; -fx-background-radius: 5;"/>
+                       styleClass="button, success-button"/>
             </HBox>
-            <Separator/>
 
             <!-- 聊天消息区域 -->
             <ScrollPane fx:id="chatScrollPane" VBox.vgrow="ALWAYS"
-                       fitToWidth="true" style="-fx-background-color: #ffffff;">
-                <VBox fx:id="chatBox" spacing="10" style="-fx-padding: 20; -fx-background-color: #ffffff;"/>
+                       fitToWidth="true" styleClass="scroll-pane">
+                <VBox fx:id="chatBox" spacing="15" style="-fx-padding: 20; -fx-background-color: white;"/>
             </ScrollPane>
 
             <!-- 输入区域 -->
-            <VBox style="-fx-background-color: #f5f5f5; -fx-padding: 15;" spacing="10">
+            <VBox style="-fx-background-color: #f8f9fa; -fx-padding: 15; -fx-border-color: #dee2e6; -fx-border-width: 1 0 0 0;" spacing="10">
                 <HBox spacing="10" alignment="CENTER_LEFT">
                     <Button text="😀" onAction="#handleShowEmoji"
-                           style="-fx-background-color: transparent; -fx-font-size: 20px;"/>
+                           styleClass="icon-button" style="-fx-font-size: 20px;"/>
                     <Button text="📎" onAction="#handleAttachFile"
-                           style="-fx-background-color: transparent; -fx-font-size: 18px;"/>
+                           styleClass="icon-button" style="-fx-font-size: 18px;"/>
                 </HBox>
                 <TextArea fx:id="messageInput" promptText="输入消息... (Shift+Enter 换行, Enter 发送)"
                          wrapText="true" prefRowCount="3"
-                         style="-fx-background-color: white; -fx-border-color: #ddd; -fx-border-radius: 5; -fx-background-radius: 5;"/>
+                         styleClass="text-area"/>
                 <HBox alignment="CENTER_RIGHT">
                     <Button fx:id="sendButton" text="发送" onAction="#handleSendMessage"
                            prefWidth="100" prefHeight="35"
-                           style="-fx-background-color: #0084ff; -fx-text-fill: white; -fx-font-size: 14px; -fx-background-radius: 5;"/>
+                           styleClass="button"/>
                 </HBox>
             </VBox>
         </VBox>
@@ -81,8 +82,8 @@
 
     <!-- 底部状态栏 -->
     <bottom>
-        <HBox style="-fx-background-color: #e8e8e8; -fx-padding: 8 15 8 15;">
-            <Label fx:id="statusLabel" text="就绪" style="-fx-text-fill: #666;"/>
+        <HBox style="-fx-background-color: #e9ecef; -fx-padding: 5 15;">
+            <Label fx:id="statusLabel" text="就绪" styleClass="subtitle-label" style="-fx-font-size: 12px;"/>
         </HBox>
     </bottom>
 </BorderPane>

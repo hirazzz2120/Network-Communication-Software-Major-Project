@@ -8,6 +8,8 @@
       xmlns:fx="http://javafx.com/fxml"
       fx:controller="com.example.sipclient.gui.controller.CallController"
       spacing="30" alignment="CENTER" prefWidth="400" prefHeight="500"
+      stylesheets="@../css/style.css"
+      styleClass="root"
       style="-fx-background-color: linear-gradient(to bottom, #667eea 0%, #764ba2 100%);">
 
     <padding>
@@ -23,8 +25,8 @@
     </VBox>
 
     <!-- 头像占位 -->
-    <Region prefHeight="100"/>
-    <Label text="👤" style="-fx-font-size: 80px;"/>
+    <Region prefHeight="50"/>
+    <Label text="👤" style="-fx-font-size: 80px; -fx-text-fill: white; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.2), 10, 0, 0, 5);"/>
 
     <!-- 通话计时 -->
     <Label fx:id="timerLabel" text="00:00:00"
@@ -36,10 +38,10 @@
     <HBox spacing="30" alignment="CENTER">
         <Button fx:id="muteButton" text="🔇 静音" onAction="#handleMute"
                 prefWidth="100" prefHeight="100"
-                style="-fx-background-color: rgba(255,255,255,0.3); -fx-text-fill: white; -fx-font-size: 14px; -fx-background-radius: 50;"/>
+                style="-fx-background-color: rgba(255,255,255,0.2); -fx-text-fill: white; -fx-font-size: 14px; -fx-background-radius: 50; -fx-cursor: hand;"/>
         
         <Button fx:id="hangupButton" text="📞" onAction="#handleHangup"
                 prefWidth="80" prefHeight="80"
-                style="-fx-background-color: #f44336; -fx-text-fill: white; -fx-font-size: 32px; -fx-background-radius: 40;"/>
+                style="-fx-background-color: #f44336; -fx-text-fill: white; -fx-font-size: 32px; -fx-background-radius: 40; -fx-cursor: hand; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.3), 10, 0, 0, 5);"/>
     </HBox>
 </VBox>
