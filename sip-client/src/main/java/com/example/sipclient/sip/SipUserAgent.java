@@ -51,7 +51,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-
+import com.example.sipclient.media.SdpTools;
+import com.example.sipclient.media.AudioSession;
 /**
  * Simple SIP user agent that can REGISTER and unREGISTER against an MSS registrar.
  * <p>
@@ -80,7 +81,9 @@ public final class SipUserAgent implements SipListener {
     private MessageHandler messageHandler;
     private CallManager callManager;
     private final ConcurrentHashMap<String, ServerTransaction> pendingInvites = new ConcurrentHashMap<>();
-
+    // [新增] 音频引擎与端口
+    private final AudioSession audioSession = new AudioSession();
+    private final int localAudioPort = 50000 + (int)(Math.random() * 1000);
     private final AtomicLong cseq = new AtomicLong(1);
 
     private volatile boolean registered;
@@ -317,6 +320,10 @@ public final class SipUserAgent implements SipListener {
     }
 
     public void hangup(String targetUri) throws SipException {
+        // [新增] 挂断时停止音频
+        if (audioSession.isRunning()) {
+            audioSession.stop();
+        }
         Objects.requireNonNull(targetUri, "targetUri");
         if (callManager == null) {
             throw new IllegalStateException("Call manager is not configured");
@@ -349,9 +356,19 @@ public final class SipUserAgent implements SipListener {
         }
 
         try {
+            // [新增] 1. 解析对方名片，启动音频
+            byte[] rawContent = transaction.getRequest().getRawContent();
+            if (rawContent != null) {
+                String remoteSdp = new String(rawContent, StandardCharsets.UTF_8);
+                startAudioEngine(remoteSdp);
+            }
             // 发送 200 OK 响应
             Response ok = messageFactory.createResponse(Response.OK, transaction.getRequest());
             ok.addHeader(contactHeader);
+            // [新增] 2. 回复我的名片
+            String mySdp = SdpTools.createAudioSdp(listeningPoint.getIPAddress(), localAudioPort);
+            ContentTypeHeader cth = headerFactory.createContentTypeHeader("application", "sdp");
+            ok.setContent(mySdp, cth);
             transaction.sendResponse(ok);
 
             // 标记呼叫为活跃状态
@@ -487,8 +504,10 @@ public final class SipUserAgent implements SipListener {
         );
 
         request.addHeader(contactHeader);
+        // [修改] 使用 SdpTools 生成真正的 SDP 名片
         ContentTypeHeader contentTypeHeader = headerFactory.createContentTypeHeader("application", "sdp");
-        request.setContent(buildPlaceholderSdp(), contentTypeHeader);
+        String sdpData = SdpTools.createAudioSdp(listeningPoint.getIPAddress(), localAudioPort);
+        request.setContent(sdpData, contentTypeHeader);
 
         return request;
     }
@@ -704,6 +723,11 @@ public final class SipUserAgent implements SipListener {
         }
 
         if (status >= 200 && status < 300) {
+            // [新增] 对方接听了，解析对方名片并启动音频
+            if (response.getRawContent() != null) {
+                String remoteSdp = new String(response.getRawContent(), StandardCharsets.UTF_8);
+                startAudioEngine(remoteSdp);
+            }
             registered = getExpiresFromResponse(response) > 0;
             registrationLatch.countDown();
         } else if (status >= 400) {
@@ -760,6 +784,16 @@ public final class SipUserAgent implements SipListener {
     @Override
     public void processDialogTerminated(javax.sip.DialogTerminatedEvent dialogTerminatedEvent) {
         // No-op
+    }
+    // [新增] 辅助方法：启动音频引擎
+    private void startAudioEngine(String remoteSdp) {
+        String remoteIp = SdpTools.getRemoteIp(remoteSdp);
+        int remotePort = SdpTools.getRemotePort(remoteSdp);
+        System.out.println(">>> [Audio] 启动通话，对方: " + remoteIp + ":" + remotePort);
+
+        if (remoteIp != null && remotePort > 0) {
+            new Thread(() -> audioSession.start(remoteIp, remotePort, localAudioPort)).start();
+        }
     }
 }
 
