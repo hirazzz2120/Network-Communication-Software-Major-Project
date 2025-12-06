@@ -65,8 +65,9 @@ public class CallManager {
         findByRemote(remoteUri).ifPresent(session -> {
             if (session.getState() != CallSession.State.ACTIVE) {
                 session.markActive();
-                session.startMedia(mediaSupplier.get());
-                log.info("呼叫 {} 已建立媒体通道", session.getId());
+                // 音频已由 SipUserAgent 直接管理，不再在这里启动
+                // session.startMedia(mediaSupplier.get());
+                log.info("呼叫 {} 已建立", session.getId());
             }
         });
     }
@@ -100,7 +101,8 @@ public class CallManager {
     public void answerCall(String remoteUri) {
         findByRemote(remoteUri).ifPresent(session -> {
             session.markActive();
-            session.startMedia(mediaSupplier.get());
+            // 音频已由 SipUserAgent 直接管理，不再在这里启动
+            // session.startMedia(mediaSupplier.get());
             log.info("已接听来自 {} 的呼叫", remoteUri);
         });
     }
