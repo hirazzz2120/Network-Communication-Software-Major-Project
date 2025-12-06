@@ -37,8 +37,13 @@
         </HBox>
         
         <HBox spacing="10" alignment="CENTER_LEFT">
-            <Label text="音频设备:"/>
-            <ComboBox fx:id="audioDeviceComboBox" prefWidth="200" styleClass="combo-box"/>
+            <Label text="输入设备（麦克风）:" prefWidth="130"/>
+            <ComboBox fx:id="inputDeviceComboBox" prefWidth="250" styleClass="combo-box"/>
+        </HBox>
+        
+        <HBox spacing="10" alignment="CENTER_LEFT">
+            <Label text="输出设备（扬声器）:" prefWidth="130"/>
+            <ComboBox fx:id="outputDeviceComboBox" prefWidth="250" styleClass="combo-box"/>
         </HBox>
     </VBox>
     
