@@ -69,7 +69,11 @@
             <artifactId>slf4j-log4j12</artifactId>
             <version>1.7.36</version>
         </dependency>
-        
+        <dependency>
+            <groupId>com.github.sarxos</groupId>
+            <artifactId>webcam-capture</artifactId>
+            <version>0.3.12</version>
+        </dependency>
         <!-- Testing -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

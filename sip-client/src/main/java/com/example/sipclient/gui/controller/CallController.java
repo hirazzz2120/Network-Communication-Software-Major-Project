@@ -5,9 +5,11 @@ import com.example.sipclient.gui.model.Contact;
 import com.example.sipclient.sip.SipUserAgent;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
+import javafx.application.Platform; // 🟢 新增导入
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.image.ImageView; // 🟢 新增导入
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
@@ -22,33 +24,43 @@ public class CallController {
     @FXML private Button hangupButton;
     @FXML private Button muteButton;
 
+    // 👇👇👇【新增变量】👇👇👇
+    @FXML private ImageView videoView; // 用于显示视频画面
+    @FXML private Label avatarLabel;   // 默认的头像（有视频时隐藏）
+    // 👆👆👆【新增结束】👆👆👆
+
     private Contact contact;
     private SipUserAgent userAgent;
     private CallManager callManager;
     private Timeline timer;
     private int seconds = 0;
     private boolean muted = false;
-    private boolean isReceiver = false; // 是否为接听方
-
-    public void setCallInfo(Contact contact, SipUserAgent userAgent, CallManager callManager) {
-        setCallInfo(contact, userAgent, callManager, false);
-    }
 
     public void setCallInfo(Contact contact, SipUserAgent userAgent, CallManager callManager, boolean isReceiver) {
         this.contact = contact;
         this.userAgent = userAgent;
         this.callManager = callManager;
-        this.isReceiver = isReceiver;
-        
+
         contactNameLabel.setText(contact.getDisplayName());
-        
+
+        // 👇👇👇【新增核心绑定逻辑】👇👇👇
+        // 当 VideoSession 收到摄像头画面时，自动在界面的 videoView 上显示
+        // 注意：必须用 Platform.runLater 包裹，因为这属于 UI 操作
+        userAgent.getVideoSession().setFrameCallback(image -> {
+            if (image != null) {
+                Platform.runLater(() -> {
+                    avatarLabel.setVisible(false); // 隐藏"👤"头像
+                    videoView.setImage(image);     // 显示对方的脸！
+                });
+            }
+        });
+        // 👆👆👆【新增结束】👆👆👆
+
         if (isReceiver) {
-            // 接听方立即显示通话中并开始计时
-            callStatusLabel.setText("通话中");
+            callStatusLabel.setText("通话中...");
             startTimer();
         } else {
-            // 发起方先显示呼叫中，等待接通后再计时
-            callStatusLabel.setText("呼叫中...");
+            callStatusLabel.setText("正在呼叫...");
             waitForCallEstablished();
         }
     }
@@ -56,6 +68,13 @@ public class CallController {
     @FXML
     private void handleHangup() {
         try {
+            // 👇👇👇【新增清理逻辑】👇👇👇
+            // 挂断时清理回调，防止后台还在不停刷新 UI
+            if (userAgent != null) {
+                userAgent.getVideoSession().setFrameCallback(null);
+            }
+            // 👆👆👆【新增结束】👆👆👆
+
             userAgent.hangup(contact.getSipUri());
             stopTimer();
             closeWindow();
@@ -68,17 +87,14 @@ public class CallController {
     private void handleMute() {
         muted = !muted;
         muteButton.setText(muted ? "取消静音" : "静音");
-        // TODO: 实现静音功能
     }
 
     private void waitForCallEstablished() {
-        // 创建一个轮询任务，检查呼叫是否已建立
         Timeline checkTimer = new Timeline(new KeyFrame(Duration.millis(500), event -> {
             if (callManager != null) {
                 callManager.findByRemote(contact.getSipUri()).ifPresent(session -> {
                     if (session.getState() == com.example.sipclient.call.CallSession.State.ACTIVE) {
-                        // 呼叫已建立，更新状态并开始计时
-                        callStatusLabel.setText("通话中");
+                        callStatusLabel.setText("通话已建立");
                         startTimer();
                     }
                 });
@@ -86,34 +102,22 @@ public class CallController {
         }));
         checkTimer.setCycleCount(Timeline.INDEFINITE);
         checkTimer.play();
-        
-        // 设置最大等待时间（60秒）
-        Timeline timeoutTimer = new Timeline(new KeyFrame(Duration.seconds(60), event -> {
-            checkTimer.stop();
-        }));
-        timeoutTimer.play();
+
+        new Timeline(new KeyFrame(Duration.seconds(60), e -> checkTimer.stop())).play();
     }
 
     private void startTimer() {
-        if (timer != null) {
-            return; // 防止重复启动
-        }
-        
+        if (timer != null) return;
         timer = new Timeline(new KeyFrame(Duration.seconds(1), event -> {
             seconds++;
-            int hours = seconds / 3600;
-            int minutes = (seconds % 3600) / 60;
-            int secs = seconds % 60;
-            timerLabel.setText(String.format("%02d:%02d:%02d", hours, minutes, secs));
+            timerLabel.setText(String.format("%02d:%02d:%02d", seconds/3600, (seconds%3600)/60, seconds%60));
         }));
         timer.setCycleCount(Timeline.INDEFINITE);
         timer.play();
     }
 
     private void stopTimer() {
-        if (timer != null) {
-            timer.stop();
-        }
+        if (timer != null) timer.stop();
     }
 
     private void closeWindow() {

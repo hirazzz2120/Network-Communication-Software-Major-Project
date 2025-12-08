@@ -244,20 +244,28 @@ public class MainController {
 
     @FXML
     private void handleMakeVideoCall() {
-        if (currentContact == null) return;
-        
-        // TODO: 视频通话功能待实现
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("功能待实现");
-        alert.setHeaderText("视频通话");
-        alert.setContentText("视频通话功能正在开发中，敬请期待！\n\n"
-                + "联系人: " + currentContact.getDisplayName() + "\n"
-                + "SIP URI: " + currentContact.getSipUri());
-        alert.showAndWait();
-        
-        statusLabel.setText("视频通话功能待实现");
-    }
+        // 1. 检查是否选择了联系人
+        if (currentContact == null) {
+            showAlert("提示", "请先选择一个联系人");
+            return;
+        }
 
+        try {
+            // 2. 调用 SipUserAgent 发起呼叫，第二个参数 true 表示【开启视频】
+            // 这就是连接点！它会告诉后端：“我要打视频电话，请把视频引擎 VideoSession 开起来”
+            userAgent.startCall(currentContact.getSipUri(), true);
+
+            // 3. 更新界面状态
+            statusLabel.setText("正在发起视频呼叫: " + currentContact.getDisplayName());
+
+            // 4. 打开通话窗口 (显示对方画面)
+            showCallWindow(currentContact);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            showAlert("呼叫失败", "无法发起视频呼叫: " + e.getMessage());
+        }
+    }
     private void displayMessage(Message msg) {
         HBox messageBox = new HBox(10);
         messageBox.setAlignment(msg.isFromMe() ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
