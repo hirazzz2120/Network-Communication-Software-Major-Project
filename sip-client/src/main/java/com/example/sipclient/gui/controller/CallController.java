@@ -1,6 +1,7 @@
 package com.example.sipclient.gui.controller;
 
 import com.example.sipclient.call.CallManager;
+import com.example.sipclient.call.CallSession;
 import com.example.sipclient.gui.model.Contact;
 import com.example.sipclient.sip.SipUserAgent;
 import javafx.animation.KeyFrame;
@@ -40,8 +41,7 @@ public class CallController {
 
         contactNameLabel.setText(contact.getDisplayName());
 
-        // 🛠️ 绑定视频回调
-        // 1. 远程画面 -> 大屏幕
+        // 🛠️ 绑定视频回调 (远程)
         userAgent.getVideoSession().setFrameCallback(image -> {
             if (image != null) {
                 Platform.runLater(() -> {
@@ -51,10 +51,12 @@ public class CallController {
             }
         });
 
-        // 2. 本地画面 -> 右下角小屏幕 (需要 VideoSession 支持，下一步我们会加)
+        // 🛠️ 绑定视频回调 (本地预览)
         userAgent.getVideoSession().setLocalFrameCallback(image -> {
             if (image != null) {
-                Platform.runLater(() -> localVideoView.setImage(image));
+                Platform.runLater(() -> {
+                    localVideoView.setImage(image);
+                });
             }
         });
 
@@ -70,55 +72,72 @@ public class CallController {
     @FXML
     private void handleHangup() {
         try {
-            // 清理回调
-            if (userAgent != null && userAgent.getVideoSession() != null) {
-                userAgent.getVideoSession().setFrameCallback(null);
-                userAgent.getVideoSession().setLocalFrameCallback(null);
-            }
+            cleanupCallbacks();
             userAgent.hangup(contact.getSipUri());
             stopTimer();
             closeWindow();
-        } catch (Exception e) { e.printStackTrace(); }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    // 清理回调，防止内存泄漏和后台更新UI报错
+    private void cleanupCallbacks() {
+        if (userAgent != null && userAgent.getVideoSession() != null) {
+            userAgent.getVideoSession().setFrameCallback(null);
+            userAgent.getVideoSession().setLocalFrameCallback(null);
+        }
     }
 
     @FXML
     private void handleMute() {
         muted = !muted;
         muteButton.setText(muted ? "🔈" : "🔇");
-        muteButton.setStyle(muted
-                ? "-fx-background-color: #ffc107; -fx-text-fill: black; -fx-font-size: 24px; -fx-background-radius: 30;"
-                : "-fx-background-color: rgba(255,255,255,0.2); -fx-text-fill: white; -fx-font-size: 24px; -fx-background-radius: 30;");
+        // 实际上这里还需要调用 AudioSession 的 mute 方法，暂时只做 UI 变更
     }
 
     private void waitForCallEstablished() {
         Timeline checkTimer = new Timeline(new KeyFrame(Duration.millis(500), event -> {
             if (callManager != null) {
                 callManager.findByRemote(contact.getSipUri()).ifPresent(session -> {
-                    if (session.getState() == com.example.sipclient.call.CallSession.State.ACTIVE) {
+                    if (session.getState() == CallSession.State.ACTIVE) {
                         callStatusLabel.setText("通话已建立");
                         startTimer();
+                    } else if (session.getState() == CallSession.State.TERMINATED) {
+                        // 对方拒接或挂断
+                        cleanupCallbacks();
+                        stopTimer();
+                        closeWindow();
                     }
                 });
             }
         }));
         checkTimer.setCycleCount(Timeline.INDEFINITE);
         checkTimer.play();
-        new Timeline(new KeyFrame(Duration.seconds(60), e -> checkTimer.stop())).play();
+
+        // 60秒超时自动挂断
+        new Timeline(new KeyFrame(Duration.seconds(60), e -> {
+            checkTimer.stop();
+            if (timer == null) handleHangup();
+        })).play();
     }
 
     private void startTimer() {
         if (timer != null) return;
         timer = new Timeline(new KeyFrame(Duration.seconds(1), event -> {
             seconds++;
-            long hrs = seconds / 3600;
-            long mins = (seconds % 3600) / 60;
+            long mins = seconds / 60;
             long secs = seconds % 60;
-            timerLabel.setText(String.format("%02d:%02d", mins, secs)); // 简化显示分:秒
+            timerLabel.setText(String.format("%02d:%02d", mins, secs));
         }));
         timer.setCycleCount(Timeline.INDEFINITE);
         timer.play();
     }
 
     private void stopTimer() { if (timer != null) timer.stop(); }
-    private void closeWindow() { ((Stage) hangupButton.getScene().getWindow()).close(); }
+
+    private void closeWindow() {
+        Stage stage = (Stage) hangupButton.getScene().getWindow();
+        if (stage != null) stage.close();
+    }
 }

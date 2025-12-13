@@ -4,10 +4,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import javax.sound.sampled.*;
 import java.net.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
- * 成员 A 实现的真实音频会话
- * 版本：Little Endian 修正版 (解决杂音问题)
+ * 音频会话 - G.711 PCMU 格式
  */
 public class AudioSession implements MediaSession {
 
@@ -16,19 +17,22 @@ public class AudioSession implements MediaSession {
     private volatile boolean running = false;
     private DatagramSocket socket;
 
-    // ⚠️ [修改点1] 改为 false (使用 Little Endian 小端序)，适配大多数 PC 声卡
-    // 参数：8000Hz, 16bit, 单声道, 有符号, 小端序(false)
-    private final AudioFormat format = new AudioFormat(8000, 16, 1, true, false);
+    // 统一音频格式：8000Hz, 16bit, 单声道, Signed, Little Endian (大部分PC的标准)
+    private static final AudioFormat FORMAT = new AudioFormat(8000, 16, 1, true, false);
+    // 数据包大小
+    private static final int BUFFER_SIZE = 1024;
 
     private String remoteIp;
     private int remotePort;
 
+    private final ExecutorService executor = Executors.newFixedThreadPool(2);
+
     @Override
     public void start() {
-        log.warn("请调用带参数的 start(ip, port, localPort) 来启动真实通话");
+        log.warn("请调用带参数的 start(ip, port, localPort)");
     }
 
-    public void start(String targetIp, int targetPort, int localPort) {
+    public synchronized void start(String targetIp, int targetPort, int localPort) {
         if (running) return;
         this.remoteIp = targetIp;
         this.remotePort = targetPort;
@@ -36,103 +40,122 @@ public class AudioSession implements MediaSession {
 
         try {
             socket = new DatagramSocket(localPort);
-            log.info("音频会话启动 (Little Endian)，本地: {}, 目标: {}:{}", localPort, targetIp, targetPort);
+            log.info(">>> [Audio] 启动! 本地:{} -> 目标:{}:{}", localPort, targetIp, targetPort);
 
-            new Thread(this::captureAndSend, "Audio-Sender").start();
-            new Thread(this::receiveAndPlay, "Audio-Receiver").start();
+            executor.submit(this::captureAndSend);
+            executor.submit(this::receiveAndPlay);
 
         } catch (SocketException e) {
-            log.error("启动失败: {}", e.getMessage());
+            log.error("Audio Socket启动失败", e);
             running = false;
         }
     }
 
     @Override
-    public void stop() {
+    public synchronized void stop() {
         if (!running) return;
         running = false;
+
         if (socket != null && !socket.isClosed()) {
             socket.close();
         }
-        log.info("音频会话已停止");
+        log.info(">>> [Audio] 停止");
     }
 
     public boolean isRunning() {
         return running;
     }
 
-    // --- 发送逻辑 ---
+    // --- 采集并发送 ---
     private void captureAndSend() {
+        TargetDataLine mic = null;
         try {
-            DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
-            TargetDataLine mic = (TargetDataLine) AudioSystem.getLine(info);
-            mic.open(format);
+            DataLine.Info info = new DataLine.Info(TargetDataLine.class, FORMAT);
+            if (!AudioSystem.isLineSupported(info)) {
+                log.error("当前系统不支持此音频格式");
+                return;
+            }
+
+            mic = (TargetDataLine) AudioSystem.getLine(info);
+            mic.open(FORMAT);
             mic.start();
 
-            byte[] pcmBuffer = new byte[1024];
+            byte[] pcmBuffer = new byte[BUFFER_SIZE]; // 16-bit PCM
             InetAddress address = InetAddress.getByName(remoteIp);
 
-            log.info("麦克风已开启...");
-            while (running) {
+            log.info("麦克风采集开始...");
+            while (running && !socket.isClosed()) {
                 int bytesRead = mic.read(pcmBuffer, 0, pcmBuffer.length);
                 if (bytesRead > 0) {
-                    byte[] compressedBuffer = new byte[bytesRead / 2];
-
+                    // 压缩 PCM -> G.711 u-law (体积减半)
+                    byte[] ulawData = new byte[bytesRead / 2];
                     for (int i = 0; i < bytesRead / 2; i++) {
-                        // ⚠️ [修改点2] 小端序拼装：低位在前(2*i)，高位在后(2*i+1)
-                        int low = pcmBuffer[2 * i];
+                        // 16bit 转 short (Little Endian)
+                        int low = pcmBuffer[2 * i] & 0xFF;
                         int high = pcmBuffer[2 * i + 1];
-                        // 拼成 16bit 样本
-                        short sample = (short) ((high << 8) | (low & 0xFF));
+                        short sample = (short) ((high << 8) | low);
 
-                        compressedBuffer[i] = G711.linear2ulaw(sample);
+                        ulawData[i] = G711.linear2ulaw(sample);
                     }
 
-                    DatagramPacket packet = new DatagramPacket(compressedBuffer, compressedBuffer.length, address, remotePort);
+                    // 发送 UDP 包
+                    DatagramPacket packet = new DatagramPacket(ulawData, ulawData.length, address, remotePort);
                     socket.send(packet);
                 }
             }
-            mic.close();
         } catch (Exception e) {
-            log.error("麦克风采集异常: ", e);
+            log.error("麦克风采集异常", e);
+        } finally {
+            if (mic != null) {
+                mic.stop();
+                mic.close();
+            }
         }
     }
 
-    // --- 接收逻辑 ---
+    // --- 接收并播放 ---
     private void receiveAndPlay() {
+        SourceDataLine speaker = null;
         try {
-            DataLine.Info info = new DataLine.Info(SourceDataLine.class, format);
-            SourceDataLine speaker = (SourceDataLine) AudioSystem.getLine(info);
-            speaker.open(format);
+            DataLine.Info info = new DataLine.Info(SourceDataLine.class, FORMAT);
+            speaker = (SourceDataLine) AudioSystem.getLine(info);
+            speaker.open(FORMAT);
             speaker.start();
 
-            byte[] compressedBuffer = new byte[512];
-            DatagramPacket packet = new DatagramPacket(compressedBuffer, compressedBuffer.length);
+            // 接收缓冲区 (G.711 数据)
+            byte[] receiveBuffer = new byte[BUFFER_SIZE / 2];
+            DatagramPacket packet = new DatagramPacket(receiveBuffer, receiveBuffer.length);
 
-            log.info("扬声器已就绪...");
-            while (running) {
+            log.info("扬声器播放就绪...");
+            while (running && !socket.isClosed()) {
                 try {
                     socket.receive(packet);
-
                     int len = packet.getLength();
-                    byte[] pcmData = new byte[len * 2];
+                    if (len > 0) {
+                        // 解压 G.711 u-law -> PCM
+                        byte[] pcmData = new byte[len * 2];
+                        for (int i = 0; i < len; i++) {
+                            short sample = G711.ulaw2linear(receiveBuffer[i]);
+                            // short 转 16bit bytes (Little Endian)
+                            pcmData[2 * i] = (byte) (sample & 0xFF);
+                            pcmData[2 * i + 1] = (byte) ((sample >> 8) & 0xFF);
+                        }
 
-                    for (int i = 0; i < len; i++) {
-                        short sample = G711.ulaw2linear(compressedBuffer[i]);
-
-                        // ⚠️ [修改点3] 小端序拆分：先存低位，再存高位
-                        pcmData[2 * i] = (byte) (sample & 0xFF);        // 低位
-                        pcmData[2 * i + 1] = (byte) ((sample >> 8) & 0xFF); // 高位
+                        // 写入扬声器
+                        speaker.write(pcmData, 0, pcmData.length);
                     }
-
-                    speaker.write(pcmData, 0, pcmData.length);
-                } catch (SocketException e) {
+                } catch (SocketException se) {
                     break;
                 }
             }
-            speaker.close();
         } catch (Exception e) {
-            log.error("播放异常: ", e);
+            log.error("音频播放异常", e);
+        } finally {
+            if (speaker != null) {
+                speaker.drain();
+                speaker.stop();
+                speaker.close();
+            }
         }
     }
 }

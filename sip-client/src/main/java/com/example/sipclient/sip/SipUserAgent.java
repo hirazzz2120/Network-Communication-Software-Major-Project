@@ -1,8 +1,10 @@
 package com.example.sipclient.sip;
 
 import com.example.sipclient.call.CallManager;
-import com.example.sipclient.call.CallSession;
 import com.example.sipclient.chat.MessageHandler;
+import com.example.sipclient.media.AudioSession;
+import com.example.sipclient.media.SdpTools;
+import com.example.sipclient.media.VideoSession;
 import gov.nist.javax.sip.SipStackExt;
 import gov.nist.javax.sip.clientauthutils.AccountManager;
 import gov.nist.javax.sip.clientauthutils.AuthenticationHelper;
@@ -17,10 +19,6 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
-
-import com.example.sipclient.media.SdpTools;
-import com.example.sipclient.media.AudioSession;
-import com.example.sipclient.media.VideoSession; // ✅ 必须引入这个
 
 public final class SipUserAgent implements SipListener {
 
@@ -45,25 +43,32 @@ public final class SipUserAgent implements SipListener {
     private CallManager callManager;
     private final ConcurrentHashMap<String, ServerTransaction> pendingInvites = new ConcurrentHashMap<>();
 
-    // ✅ 新增：同时拥有音频和视频引擎
+    // 媒体会话
     private final AudioSession audioSession = new AudioSession();
     private final VideoSession videoSession = new VideoSession();
 
-    // ✅ 新增：独立的视频端口
-    private final int localAudioPort = 50000 + (int)(Math.random() * 1000);
-    private final int localVideoPort = 52000 + (int)(Math.random() * 1000);
+    // 本地媒体端口 (固定端口以便于防火墙调试，实际生产应动态分配)
+    private final int localAudioPort;
+    private final int localVideoPort;
 
     private final AtomicLong cseq = new AtomicLong(1);
     private volatile boolean registered;
     private volatile CountDownLatch registrationLatch = new CountDownLatch(0);
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     private volatile ScheduledFuture<?> reRegisterTask;
-    private volatile ScheduledFuture<?> keepAliveTask;
 
     public SipUserAgent(String userAddress, String password, String localIp, int localPort) throws Exception {
-        // ... (构造函数基础配置保持不变) ...
-        Objects.requireNonNull(userAddress); Objects.requireNonNull(password); Objects.requireNonNull(localIp);
+        Objects.requireNonNull(userAddress);
+        Objects.requireNonNull(password);
+        Objects.requireNonNull(localIp);
+
         this.password = password;
+
+        // 基于 SIP 端口生成媒体端口，避免冲突
+        // 例如 SIP 5060 -> Audio 20000, Video 20002
+        this.localAudioPort = 20000 + (localPort % 1000) * 10;
+        this.localVideoPort = this.localAudioPort + 2;
+
         SipFactory sipFactory = SipFactory.getInstance();
         sipFactory.setPathName("gov.nist");
         this.addressFactory = sipFactory.createAddressFactory();
@@ -79,10 +84,11 @@ public final class SipUserAgent implements SipListener {
         Properties properties = new Properties();
         properties.setProperty("javax.sip.STACK_NAME", "SipClientStack-" + localPort);
         properties.setProperty("javax.sip.IP_ADDRESS", localIp);
+        // 如果有 MSS，可开启 outbound proxy
         properties.setProperty("gov.nist.javax.sip.OUTBOUND_PROXY", registrarHost + ":" + registrarPort + "/" + transport);
         properties.setProperty("gov.nist.javax.sip.TRACE_LEVEL", "0");
-        properties.setProperty("gov.nist.javax.sip.RELIABLE_CONNECTION_KEEP_ALIVE_TIMEOUT", "30");
-        properties.setProperty("gov.nist.javax.sip.THREAD_POOL_SIZE", "4");
+        properties.setProperty("gov.nist.javax.sip.RELIABLE_CONNECTION_KEEP_ALIVE_TIMEOUT", "60");
+        properties.setProperty("gov.nist.javax.sip.THREAD_POOL_SIZE", "8");
 
         this.sipStack = sipFactory.createSipStack(properties);
         this.listeningPoint = sipStack.createListeningPoint(localIp, localPort, transport);
@@ -98,18 +104,16 @@ public final class SipUserAgent implements SipListener {
         this.authenticationHelper = ((SipStackExt) sipStack).getAuthenticationHelper(accountManager, headerFactory);
     }
 
-    // ✅ 关键方法：暴露视频引擎给 UI 调用（修复 CallController 报错）
-    public VideoSession getVideoSession() {
-        return this.videoSession;
-    }
-
+    public VideoSession getVideoSession() { return this.videoSession; }
     public void setMessageHandler(MessageHandler messageHandler) { this.messageHandler = messageHandler; }
     public void setCallManager(CallManager callManager) { this.callManager = callManager; }
     public CallManager getCallManager() { return this.callManager; }
 
+    // --- 注册/注销 ---
     public boolean register(Duration timeout) throws SipException, InterruptedException {
         return sendRegister(3600, timeout);
     }
+
     public boolean unregister(Duration timeout) throws SipException, InterruptedException {
         return sendRegister(0, timeout);
     }
@@ -117,73 +121,77 @@ public final class SipUserAgent implements SipListener {
     public void shutdown() {
         scheduler.shutdownNow();
         if (registered) try { unregister(Duration.ofSeconds(1)); } catch (Exception e) {}
-        // ✅ 关闭时同时停止音频和视频
-        if (audioSession.isRunning()) audioSession.stop();
-        if (videoSession.isRunning()) videoSession.stop();
+        stopMedia(); // 停止媒体
         if (sipStack != null) try { sipStack.stop(); } catch (Exception e) {}
     }
 
     public boolean isRegistered() { return registered; }
 
-    // --- 呼叫相关 ---
+    // --- 呼叫控制 ---
 
-    // 默认音频呼叫
+    // 兼容旧API
+    public void makeCall(String targetUri) throws SipException { startCall(targetUri, false); }
     public void startCall(String targetUri) throws SipException { startCall(targetUri, false); }
 
-    // ✅ 支持视频的呼叫
     public void startCall(String targetUri, boolean enableVideo) throws SipException {
         try {
             Request invite = createInviteRequest(targetUri, enableVideo);
+            ClientTransaction ctx = sipProvider.getNewClientTransaction(invite);
+
             if (callManager != null) callManager.startOutgoing(normalizeUri(targetUri));
-            sipProvider.getNewClientTransaction(invite).sendRequest();
-        } catch (Exception e) { throw new IllegalArgumentException("呼叫失败", e); }
+            ctx.sendRequest();
+            System.out.println("INVITE Sent to " + targetUri + " (Video=" + enableVideo + ")");
+        } catch (Exception e) {
+            throw new IllegalArgumentException("呼叫失败: " + e.getMessage(), e);
+        }
     }
 
-    // 兼容旧代码
-    public void makeCall(String targetUri) throws SipException { startCall(targetUri, false); }
-
     public void hangup(String targetUri) throws SipException {
-        // ✅ 挂断时全停
-        if (audioSession.isRunning()) audioSession.stop();
-        if (videoSession.isRunning()) videoSession.stop();
+        stopMedia(); // 挂断立即停止媒体
 
         if (callManager == null) return;
         String normalized = normalizeUri(targetUri);
+
         callManager.findByRemote(normalized).ifPresent(session -> {
             try {
-                if (session.getDialog() != null) {
-                    session.getDialog().sendRequest(sipProvider.getNewClientTransaction(session.getDialog().createRequest(Request.BYE)));
+                if (session.getDialog() != null && session.getDialog().getState() == DialogState.CONFIRMED) {
+                    Request bye = session.getDialog().createRequest(Request.BYE);
+                    ClientTransaction ctx = sipProvider.getNewClientTransaction(bye);
+                    session.getDialog().sendRequest(ctx);
                 }
                 callManager.terminateLocal(normalized);
-            } catch (Exception e) {}
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         });
     }
 
     public void answerCall(String fromUri) throws SipException {
         String normalized = normalizeUri(fromUri);
         ServerTransaction tx = pendingInvites.remove(normalized);
-        if (tx == null) return;
+        if (tx == null) {
+            System.err.println("找不到挂起的 INVITE 事务: " + normalized);
+            return;
+        }
 
         try {
-            // 1. 解析对方 SDP
+            // 解析对方 SDP
             String remoteSdp = "";
             byte[] raw = tx.getRequest().getRawContent();
             if (raw != null) {
                 remoteSdp = new String(raw, StandardCharsets.UTF_8);
-                // 启动媒体 (音频+视频)
-                startMediaEngines(remoteSdp);
             }
 
-            // 2. 回复 200 OK
+            // 立即启动媒体接收
+            startMediaEngines(remoteSdp);
+
             Response ok = messageFactory.createResponse(Response.OK, tx.getRequest());
             ok.addHeader(contactHeader);
 
-            // ⚠️【修复点】根据对方是否提供了视频端口，来决定我们是否回复视频端口
-            // 之前是判断 videoSession.isRunning()，这有延时会导致判断错误
+            // 检查对方是否有视频，有则我也开启视频端口
             int remoteVideoPort = SdpTools.getRemoteVideoPort(remoteSdp);
             boolean enableVideo = remoteVideoPort > 0;
 
-            // 生成我的 SDP
             String mySdp = SdpTools.createSdp(listeningPoint.getIPAddress(),
                     localAudioPort,
                     enableVideo ? localVideoPort : 0);
@@ -192,9 +200,37 @@ public final class SipUserAgent implements SipListener {
             tx.sendResponse(ok);
 
             if (callManager != null) callManager.answerCall(normalized);
-        } catch (Exception e) { throw new SipException("接听失败", e); }
+
+        } catch (Exception e) {
+            throw new SipException("接听失败", e);
+        }
     }
-    // --- 事件处理 ---
+
+    // --- 辅助逻辑 ---
+
+    private void stopMedia() {
+        if (audioSession.isRunning()) audioSession.stop();
+        if (videoSession.isRunning()) videoSession.stop();
+    }
+
+    private void startMediaEngines(String remoteSdp) {
+        if (remoteSdp == null || remoteSdp.isEmpty()) return;
+
+        String remoteIp = SdpTools.getRemoteIp(remoteSdp);
+        int rAudio = SdpTools.getRemotePort(remoteSdp);
+        int rVideo = SdpTools.getRemoteVideoPort(remoteSdp);
+
+        System.out.println(">>> SDP 解析: RemoteIP=" + remoteIp + " AudioPort=" + rAudio + " VideoPort=" + rVideo);
+
+        if (remoteIp != null && rAudio > 0) {
+            new Thread(() -> audioSession.start(remoteIp, rAudio, localAudioPort)).start();
+        }
+        if (remoteIp != null && rVideo > 0) {
+            new Thread(() -> videoSession.start(remoteIp, rVideo, localVideoPort)).start();
+        }
+    }
+
+    // --- SIP Listener 实现 ---
     public void processRequest(RequestEvent evt) {
         String m = evt.getRequest().getMethod();
         if (Request.MESSAGE.equals(m)) handleMessage(evt);
@@ -202,79 +238,72 @@ public final class SipUserAgent implements SipListener {
         else if (Request.BYE.equals(m)) handleBye(evt);
         else if (Request.ACK.equals(m)) handleAck(evt);
     }
+
     public void processResponse(ResponseEvent evt) {
-        String m = ((CSeqHeader)evt.getResponse().getHeader(CSeqHeader.NAME)).getMethod();
-        if (Request.REGISTER.equals(m)) handleRegisterResponse(evt);
-        else if (Request.INVITE.equals(m)) handleInviteResponse(evt);
+        Response response = evt.getResponse();
+        String method = ((CSeqHeader)response.getHeader(CSeqHeader.NAME)).getMethod();
+
+        if (Request.REGISTER.equals(method)) handleRegisterResponse(evt);
+        else if (Request.INVITE.equals(method)) {
+            if (response.getStatusCode() == Response.OK) {
+                // 呼叫方收到 200 OK，启动媒体
+                try {
+                    byte[] raw = response.getRawContent();
+                    if (raw != null) startMediaEngines(new String(raw, StandardCharsets.UTF_8));
+
+                    if (evt.getDialog() != null) {
+                        Request ack = evt.getDialog().createAck(((CSeqHeader)response.getHeader(CSeqHeader.NAME)).getSeqNumber());
+                        evt.getDialog().sendAck(ack);
+
+                        if (callManager != null) {
+                            callManager.attachDialog(extractToUri(response), evt.getDialog());
+                            callManager.markActive(extractToUri(response));
+                        }
+                    }
+                } catch (Exception e) { e.printStackTrace(); }
+            }
+        }
     }
+
     public void processTimeout(TimeoutEvent e) { registrationLatch.countDown(); }
     public void processIOException(IOExceptionEvent e) { registrationLatch.countDown(); }
     public void processTransactionTerminated(TransactionTerminatedEvent e) {}
     public void processDialogTerminated(DialogTerminatedEvent e) {}
 
-    // --- 逻辑处理 ---
-    private void handleInviteResponse(ResponseEvent event) {
-        Response response = event.getResponse();
-        if (response.getStatusCode() >= 200 && response.getStatusCode() < 300) {
-            // ✅ 修复：呼叫方收到 200 OK 必须启动媒体
-            try {
-                byte[] raw = response.getRawContent();
-                if (raw != null) startMediaEngines(new String(raw, StandardCharsets.UTF_8));
-
-                if (event.getDialog() != null) {
-                    event.getDialog().sendAck(event.getDialog().createAck(((CSeqHeader)response.getHeader(CSeqHeader.NAME)).getSeqNumber()));
-                    if (callManager != null) {
-                        callManager.attachDialog(extractToUri(response), event.getDialog());
-                        callManager.markActive(extractToUri(response));
-                    }
-                }
-            } catch (Exception e) {}
-        } else if (response.getStatusCode() >= 400 && callManager != null) {
-            callManager.terminateLocal(extractToUri(response));
-        }
-    }
-
-    // ✅ 统一启动双引擎
-    private void startMediaEngines(String remoteSdp) {
-        String remoteIp = SdpTools.getRemoteIp(remoteSdp);
-        int rAudio = SdpTools.getRemotePort(remoteSdp);
-        int rVideo = SdpTools.getRemoteVideoPort(remoteSdp);
-
-        if (remoteIp != null && rAudio > 0) {
-            System.out.println(">>> 启动音频 -> " + remoteIp + ":" + rAudio);
-            new Thread(() -> audioSession.start(remoteIp, rAudio, localAudioPort)).start();
-        }
-        if (remoteIp != null && rVideo > 0) {
-            System.out.println(">>> 启动视频 -> " + remoteIp + ":" + rVideo);
-            new Thread(() -> videoSession.start(remoteIp, rVideo, localVideoPort)).start();
-        }
-    }
-
-    // ... (标准辅助方法) ...
+    // --- 内部处理方法 ---
     private void handleMessage(RequestEvent evt) {
         try {
             sipProvider.getNewServerTransaction(evt.getRequest()).sendResponse(messageFactory.createResponse(Response.OK, evt.getRequest()));
             if (messageHandler != null) messageHandler.handleIncomingMessage(extractFromUri(evt.getRequest()), new String(evt.getRequest().getRawContent(), StandardCharsets.UTF_8));
         } catch (Exception e) {}
     }
+
     private void handleInvite(RequestEvent evt) {
         try {
             ServerTransaction tx = sipProvider.getNewServerTransaction(evt.getRequest());
             Response r = messageFactory.createResponse(Response.RINGING, evt.getRequest());
             r.addHeader(contactHeader);
             tx.sendResponse(r);
+
             pendingInvites.put(extractFromUri(evt.getRequest()), tx);
             if (callManager != null) callManager.acceptIncoming(extractFromUri(evt.getRequest()));
-        } catch (Exception e) {}
+        } catch (Exception e) { e.printStackTrace(); }
     }
-    private void handleBye(RequestEvent evt) {
-        try { sipProvider.getNewServerTransaction(evt.getRequest()).sendResponse(messageFactory.createResponse(Response.OK, evt.getRequest())); } catch (Exception e) {}
-        if (callManager != null) callManager.terminateByRemote(extractFromUri(evt.getRequest()));
-        if (audioSession.isRunning()) audioSession.stop();
-        if (videoSession.isRunning()) videoSession.stop();
-    }
-    private void handleAck(RequestEvent evt) { if (callManager != null) callManager.markActive(extractFromUri(evt.getRequest())); }
 
+    private void handleBye(RequestEvent evt) {
+        try {
+            sipProvider.getNewServerTransaction(evt.getRequest()).sendResponse(messageFactory.createResponse(Response.OK, evt.getRequest()));
+        } catch (Exception e) {}
+
+        stopMedia();
+        if (callManager != null) callManager.terminateByRemote(extractFromUri(evt.getRequest()));
+    }
+
+    private void handleAck(RequestEvent evt) {
+        if (callManager != null) callManager.markActive(extractFromUri(evt.getRequest()));
+    }
+
+    // --- 发送消息 ---
     public void sendMessage(String targetUri, String text) throws SipException {
         try {
             SipURI reqUri = (SipURI) addressFactory.createURI(targetUri);
@@ -307,11 +336,14 @@ public final class SipUserAgent implements SipListener {
                 Collections.singletonList(headerFactory.createViaHeader(listeningPoint.getIPAddress(), listeningPoint.getPort(), transport, null)),
                 headerFactory.createMaxForwardsHeader(70));
         req.addHeader(contactHeader);
+
+        // 生成 SDP
         String sdp = SdpTools.createSdp(listeningPoint.getIPAddress(), localAudioPort, video ? localVideoPort : 0);
         req.setContent(sdp, headerFactory.createContentTypeHeader("application", "sdp"));
         return req;
     }
 
+    // --- 注册相关 ---
     private boolean sendRegister(int expires, Duration timeout) throws SipException, InterruptedException {
         try {
             Request req = createRegisterRequest(expires);
