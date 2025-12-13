@@ -24,14 +24,14 @@ import java.util.function.Consumer;
 
 /**
  * 视频会话 - 实现 UDP 分片传输
- * 解决大包(>1500 bytes)在网络中被丢弃导致黑屏的问题
+ * 优化：增加发送延时防止丢包，调整分片大小
  */
 public class VideoSession implements MediaSession {
 
     private static final Logger log = LoggerFactory.getLogger(VideoSession.class);
 
-    // 网络 MTU 通常是 1500，我们留出头部空间，每个包只发 1400 字节数据
-    private static final int CHUNK_SIZE = 1400;
+    // 调整为 1024 字节，比 1400 更安全，减少被路由器分片的概率
+    private static final int CHUNK_SIZE = 1024;
     // 协议头长度：FrameId(8) + TotalChunks(2) + ChunkIndex(2) = 12 bytes
     private static final int HEADER_SIZE = 12;
 
@@ -141,7 +141,7 @@ public class VideoSession implements MediaSession {
                 // 计算需要多少个包
                 int chunks = (int) Math.ceil((double) totalLength / CHUNK_SIZE);
 
-                if (chunks > 100) { // 保护：如果图片太大(>140KB)，丢弃该帧
+                if (chunks > 200) { // 保护：如果图片太大，丢弃该帧
                     log.warn("帧过大丢弃: {} bytes", totalLength);
                     continue;
                 }
@@ -162,14 +162,16 @@ public class VideoSession implements MediaSession {
                     DatagramPacket packet = new DatagramPacket(packetData, packetData.length, targetAddress, remotePort);
                     socket.send(packet);
 
-                    // 微小的发送间隔，防止瞬间塞满网卡缓冲区导致丢包
-                    // Thread.sleep(0, 100);
+                    // ⚡ 关键修改：增加 1ms 延时。
+                    // 以前的 Thread.sleep(0, 100) 几乎不起作用，
+                    // 增加到 1ms 可以大幅减少 UDP 丢包，虽然会限制 FPS 上限，但能保证画面传输成功。
+                    try { Thread.sleep(1); } catch (Exception e) {}
                 }
 
-                // 控制帧率 ~20 FPS
+                // 控制帧率 ~15-20 FPS (增加间隔让网络喘息)
                 long elapsed = System.currentTimeMillis() - start;
-                if (elapsed < 50) {
-                    try { Thread.sleep(50 - elapsed); } catch (Exception e) {}
+                if (elapsed < 66) { // 约 15 FPS
+                    try { Thread.sleep(66 - elapsed); } catch (Exception e) {}
                 }
             }
         } catch (Exception e) {
