@@ -165,21 +165,35 @@ public final class SipUserAgent implements SipListener {
         if (tx == null) return;
 
         try {
-            // ✅ 接听时解析 SDP 启动媒体
+            // 1. 解析对方 SDP
+            String remoteSdp = "";
             byte[] raw = tx.getRequest().getRawContent();
-            if (raw != null) startMediaEngines(new String(raw, StandardCharsets.UTF_8));
+            if (raw != null) {
+                remoteSdp = new String(raw, StandardCharsets.UTF_8);
+                // 启动媒体 (音频+视频)
+                startMediaEngines(remoteSdp);
+            }
 
+            // 2. 回复 200 OK
             Response ok = messageFactory.createResponse(Response.OK, tx.getRequest());
             ok.addHeader(contactHeader);
-            // ✅ 回复 SDP (带视频端口)
-            String mySdp = SdpTools.createSdp(listeningPoint.getIPAddress(), localAudioPort, videoSession.isRunning() ? localVideoPort : 0);
+
+            // ⚠️【修复点】根据对方是否提供了视频端口，来决定我们是否回复视频端口
+            // 之前是判断 videoSession.isRunning()，这有延时会导致判断错误
+            int remoteVideoPort = SdpTools.getRemoteVideoPort(remoteSdp);
+            boolean enableVideo = remoteVideoPort > 0;
+
+            // 生成我的 SDP
+            String mySdp = SdpTools.createSdp(listeningPoint.getIPAddress(),
+                    localAudioPort,
+                    enableVideo ? localVideoPort : 0);
+
             ok.setContent(mySdp, headerFactory.createContentTypeHeader("application", "sdp"));
             tx.sendResponse(ok);
 
             if (callManager != null) callManager.answerCall(normalized);
         } catch (Exception e) { throw new SipException("接听失败", e); }
     }
-
     // --- 事件处理 ---
     public void processRequest(RequestEvent evt) {
         String m = evt.getRequest().getMethod();

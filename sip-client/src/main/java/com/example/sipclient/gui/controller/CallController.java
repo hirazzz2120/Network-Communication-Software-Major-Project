@@ -5,17 +5,14 @@ import com.example.sipclient.gui.model.Contact;
 import com.example.sipclient.sip.SipUserAgent;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
-import javafx.application.Platform; // 🟢 新增导入
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.image.ImageView; // 🟢 新增导入
+import javafx.scene.image.ImageView;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
-/**
- * 通话窗口控制器
- */
 public class CallController {
 
     @FXML private Label contactNameLabel;
@@ -24,10 +21,10 @@ public class CallController {
     @FXML private Button hangupButton;
     @FXML private Button muteButton;
 
-    // 👇👇👇【新增变量】👇👇👇
-    @FXML private ImageView videoView; // 用于显示视频画面
-    @FXML private Label avatarLabel;   // 默认的头像（有视频时隐藏）
-    // 👆👆👆【新增结束】👆👆👆
+    // 📺 视频组件
+    @FXML private ImageView remoteVideoView; // 对方画面 (大)
+    @FXML private ImageView localVideoView;  // 本机画面 (小 - 画中画)
+    @FXML private Label avatarLabel;         // 默认头像
 
     private Contact contact;
     private SipUserAgent userAgent;
@@ -43,18 +40,23 @@ public class CallController {
 
         contactNameLabel.setText(contact.getDisplayName());
 
-        // 👇👇👇【新增核心绑定逻辑】👇👇👇
-        // 当 VideoSession 收到摄像头画面时，自动在界面的 videoView 上显示
-        // 注意：必须用 Platform.runLater 包裹，因为这属于 UI 操作
+        // 🛠️ 绑定视频回调
+        // 1. 远程画面 -> 大屏幕
         userAgent.getVideoSession().setFrameCallback(image -> {
             if (image != null) {
                 Platform.runLater(() -> {
-                    avatarLabel.setVisible(false); // 隐藏"👤"头像
-                    videoView.setImage(image);     // 显示对方的脸！
+                    avatarLabel.setVisible(false); // 有画面就隐藏头像
+                    remoteVideoView.setImage(image);
                 });
             }
         });
-        // 👆👆👆【新增结束】👆👆👆
+
+        // 2. 本地画面 -> 右下角小屏幕 (需要 VideoSession 支持，下一步我们会加)
+        userAgent.getVideoSession().setLocalFrameCallback(image -> {
+            if (image != null) {
+                Platform.runLater(() -> localVideoView.setImage(image));
+            }
+        });
 
         if (isReceiver) {
             callStatusLabel.setText("通话中...");
@@ -68,25 +70,24 @@ public class CallController {
     @FXML
     private void handleHangup() {
         try {
-            // 👇👇👇【新增清理逻辑】👇👇👇
-            // 挂断时清理回调，防止后台还在不停刷新 UI
-            if (userAgent != null) {
+            // 清理回调
+            if (userAgent != null && userAgent.getVideoSession() != null) {
                 userAgent.getVideoSession().setFrameCallback(null);
+                userAgent.getVideoSession().setLocalFrameCallback(null);
             }
-            // 👆👆👆【新增结束】👆👆👆
-
             userAgent.hangup(contact.getSipUri());
             stopTimer();
             closeWindow();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        } catch (Exception e) { e.printStackTrace(); }
     }
 
     @FXML
     private void handleMute() {
         muted = !muted;
-        muteButton.setText(muted ? "取消静音" : "静音");
+        muteButton.setText(muted ? "🔈" : "🔇");
+        muteButton.setStyle(muted
+                ? "-fx-background-color: #ffc107; -fx-text-fill: black; -fx-font-size: 24px; -fx-background-radius: 30;"
+                : "-fx-background-color: rgba(255,255,255,0.2); -fx-text-fill: white; -fx-font-size: 24px; -fx-background-radius: 30;");
     }
 
     private void waitForCallEstablished() {
@@ -102,7 +103,6 @@ public class CallController {
         }));
         checkTimer.setCycleCount(Timeline.INDEFINITE);
         checkTimer.play();
-
         new Timeline(new KeyFrame(Duration.seconds(60), e -> checkTimer.stop())).play();
     }
 
@@ -110,18 +110,15 @@ public class CallController {
         if (timer != null) return;
         timer = new Timeline(new KeyFrame(Duration.seconds(1), event -> {
             seconds++;
-            timerLabel.setText(String.format("%02d:%02d:%02d", seconds/3600, (seconds%3600)/60, seconds%60));
+            long hrs = seconds / 3600;
+            long mins = (seconds % 3600) / 60;
+            long secs = seconds % 60;
+            timerLabel.setText(String.format("%02d:%02d", mins, secs)); // 简化显示分:秒
         }));
         timer.setCycleCount(Timeline.INDEFINITE);
         timer.play();
     }
 
-    private void stopTimer() {
-        if (timer != null) timer.stop();
-    }
-
-    private void closeWindow() {
-        Stage stage = (Stage) hangupButton.getScene().getWindow();
-        stage.close();
-    }
+    private void stopTimer() { if (timer != null) timer.stop(); }
+    private void closeWindow() { ((Stage) hangupButton.getScene().getWindow()).close(); }
 }

@@ -4,44 +4,54 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.image.ImageView?>
 <?import javafx.scene.layout.*?>
+<?import javafx.scene.effect.DropShadow?>
 
 <VBox xmlns="http://javafx.com/javafx"
       xmlns:fx="http://javafx.com/fxml"
       fx:controller="com.example.sipclient.gui.controller.CallController"
-      spacing="30" alignment="CENTER" prefWidth="400" prefHeight="500"
+      spacing="20" alignment="CENTER" prefWidth="400" prefHeight="600"
       stylesheets="@../css/style.css"
       styleClass="root"
-      style="-fx-background-color: linear-gradient(to bottom, #667eea 0%, #764ba2 100%);">
+      style="-fx-background-color: linear-gradient(to bottom, #2b32b2, #1488cc);">
 
     <padding>
-        <Insets top="40" right="40" bottom="40" left="40"/>
+        <Insets top="30" right="30" bottom="30" left="30"/>
     </padding>
 
-    <VBox alignment="CENTER" spacing="10">
+    <VBox alignment="CENTER" spacing="5">
         <Label fx:id="contactNameLabel" text="联系人"
-               style="-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: white;"/>
-        <Label fx:id="callStatusLabel" text="呼叫中..."
-               style="-fx-font-size: 16px; -fx-text-fill: rgba(255,255,255,0.8);"/>
+               style="-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: white;"/>
+        <Label fx:id="callStatusLabel" text="正在建立连接..."
+               style="-fx-font-size: 14px; -fx-text-fill: rgba(255,255,255,0.7);"/>
     </VBox>
 
-    <StackPane VBox.vgrow="ALWAYS">
+    <StackPane VBox.vgrow="ALWAYS" style="-fx-background-color: black; -fx-background-radius: 10;">
+        <effect>
+            <DropShadow color="rgba(0,0,0,0.5)" radius="10"/>
+        </effect>
+
+        <ImageView fx:id="remoteVideoView" fitWidth="340" fitHeight="255" preserveRatio="true"/>
+
         <Label fx:id="avatarLabel" text="👤"
-               style="-fx-font-size: 80px; -fx-text-fill: white; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.2), 10, 0, 0, 5);"/>
+               style="-fx-font-size: 80px; -fx-text-fill: rgba(255,255,255,0.3);"/>
 
-        <ImageView fx:id="videoView" fitWidth="320" fitHeight="240" preserveRatio="true"/>
+        <StackPane alignment="BOTTOM_RIGHT" pickOnBounds="false">
+            <padding><Insets bottom="10" right="10"/></padding>
+            <ImageView fx:id="localVideoView" fitWidth="80" fitHeight="60" preserveRatio="true"
+                       style="-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.5), 5, 0, 0, 0);"/>
+        </StackPane>
     </StackPane>
-    <Label fx:id="timerLabel" text="00:00:00"
-           style="-fx-font-size: 48px; -fx-font-weight: bold; -fx-text-fill: white;"/>
 
-    <Region VBox.vgrow="ALWAYS"/>
+    <Label fx:id="timerLabel" text="00:00"
+           style="-fx-font-size: 36px; -fx-font-weight: bold; -fx-text-fill: white; -fx-font-family: 'Monospaced';"/>
 
-    <HBox spacing="30" alignment="CENTER">
-        <Button fx:id="muteButton" text="🔇 静音" onAction="#handleMute"
-                prefWidth="100" prefHeight="100"
-                style="-fx-background-color: rgba(255,255,255,0.2); -fx-text-fill: white; -fx-font-size: 14px; -fx-background-radius: 50; -fx-cursor: hand;"/>
+    <HBox spacing="40" alignment="CENTER">
+        <Button fx:id="muteButton" text="🔇" onAction="#handleMute"
+                prefWidth="60" prefHeight="60"
+                style="-fx-background-color: rgba(255,255,255,0.2); -fx-text-fill: white; -fx-font-size: 24px; -fx-background-radius: 30; -fx-cursor: hand;"/>
 
         <Button fx:id="hangupButton" text="📞" onAction="#handleHangup"
-                prefWidth="80" prefHeight="80"
-                style="-fx-background-color: #f44336; -fx-text-fill: white; -fx-font-size: 32px; -fx-background-radius: 40; -fx-cursor: hand; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.3), 10, 0, 0, 5);"/>
+                prefWidth="70" prefHeight="70"
+                style="-fx-background-color: #ff4b4b; -fx-text-fill: white; -fx-font-size: 32px; -fx-background-radius: 35; -fx-cursor: hand;"/>
     </HBox>
 </VBox>

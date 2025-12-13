@@ -2,6 +2,7 @@ package com.example.sipclient.media;
 
 import com.github.sarxos.webcam.Webcam;
 import javafx.application.Platform;
+import javafx.embed.swing.SwingFXUtils; // 需要用到这个转换工具
 import javafx.scene.image.Image;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,24 +15,17 @@ import java.io.ByteArrayOutputStream;
 import java.net.*;
 import java.util.function.Consumer;
 
-/**
- * 视频会话 - 真·摄像头版 (Webcam Capture)
- * 功能：打开真实摄像头 -> 采集画面 -> JPG压缩 -> UDP发送 -> 接收显示
- */
 public class VideoSession implements MediaSession {
 
     private static final Logger log = LoggerFactory.getLogger(VideoSession.class);
     private volatile boolean running = false;
     private DatagramSocket socket;
-
     private String remoteIp;
     private int remotePort;
-
-    // 摄像头对象
     private Webcam webcam;
 
-    // 回调给 UI 显示
-    private Consumer<Image> frameCallback;
+    private Consumer<Image> frameCallback;      // 远程
+    private Consumer<Image> localFrameCallback; // 本地
 
     @Override
     public void start() {}
@@ -44,15 +38,11 @@ public class VideoSession implements MediaSession {
 
         try {
             socket = new DatagramSocket(localPort);
-            log.info(">>> [Video] 摄像头引擎启动! 本地:{} -> 目标:{}:{}", localPort, targetIp, targetPort);
-
-            // 启动发送线程 (采集)
+            log.info(">>> [Video] 启动! 本地:{} -> 目标:{}:{}", localPort, targetIp, targetPort);
             new Thread(this::captureAndSend, "Camera-Sender").start();
-            // 启动接收线程 (播放)
             new Thread(this::receiveAndPlay, "Video-Receiver").start();
-
         } catch (SocketException e) {
-            log.error("视频Socket启动失败", e);
+            log.error("Socket启动失败", e);
             running = false;
         }
     }
@@ -61,104 +51,73 @@ public class VideoSession implements MediaSession {
     public void stop() {
         running = false;
         if (socket != null) socket.close();
-
-        // 关闭摄像头 (释放硬件资源)
-        if (webcam != null) {
-            log.info("正在关闭摄像头...");
-            webcam.close();
-            log.info("摄像头已关闭");
-        }
-        log.info(">>> [Video] 视频会话已停止");
+        if (webcam != null) { webcam.close(); }
+        log.info(">>> [Video] 停止");
     }
 
     public boolean isRunning() { return running; }
+    public void setFrameCallback(Consumer<Image> callback) { this.frameCallback = callback; }
+    public void setLocalFrameCallback(Consumer<Image> callback) { this.localFrameCallback = callback; }
 
-    public void setFrameCallback(Consumer<Image> callback) {
-        this.frameCallback = callback;
-    }
-
-    // --- 发送端：摄像头采集 ---
     private void captureAndSend() {
         try {
-            // 1. 获取并打开摄像头
             webcam = Webcam.getDefault();
-            if (webcam == null) {
-                log.error("❌ 未检测到摄像头！请检查设备连接。");
-                return;
-            }
+            if (webcam == null) { log.error("❌ 无摄像头"); return; }
 
-            // 2. 设置分辨率
-            // 必须设置低分辨率 (320x240)，否则 UDP 包会溢出导致画面卡死
-            webcam.setViewSize(new Dimension(320, 240));
+            // 必须用低分辨率防止 UDP 丢包
+            webcam.setViewSize(new Dimension(176, 144));
             webcam.open();
-            log.info("✅ 摄像头已开启: {}", webcam.getName());
 
             while (running) {
                 long start = System.currentTimeMillis();
-
-                // 3. 获取一帧画面 (这是真人的脸！)
                 if (!webcam.isOpen()) break;
-                BufferedImage image = webcam.getImage();
-                if (image == null) continue;
 
-                // 4. 压缩成 JPG
+                BufferedImage bImage = webcam.getImage();
+                if (bImage == null) continue;
+
+                // 1. [新增] 回调给本地界面预览 (JavaFX Image)
+                if (localFrameCallback != null) {
+                    // 注意：SwingFXUtils 需要 requires javafx.swing 模块，
+                    // 如果报错找不到，可以用简易转换，或者忽略本地预览
+                    Image fxImage = SwingFXUtils.toFXImage(bImage, null);
+                    Platform.runLater(() -> localFrameCallback.accept(fxImage));
+                }
+
+                // 2. 压缩发送
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                ImageIO.write(image, "jpg", baos);
+                ImageIO.write(bImage, "jpg", baos);
                 byte[] data = baos.toByteArray();
 
-                // 5. UDP 发送 (限制 60k 以下，防止分片丢包)
-                if (data.length < 60000) {
+                if (data.length < 4096) { // 宽松限制
                     DatagramPacket packet = new DatagramPacket(data, data.length, InetAddress.getByName(remoteIp), remotePort);
                     socket.send(packet);
-                } else {
-                    // 如果画面太复杂导致压缩后依然很大，只能丢弃
-                    log.warn("⚠️ 帧数据过大 ({} bytes) 已丢弃，请背景不要太花哨", data.length);
                 }
 
-                // 6. 控制帧率 (约 15 FPS，保证流畅度)
                 long elapsed = System.currentTimeMillis() - start;
-                if (elapsed < 66) { // 1000ms / 15fps ≈ 66ms
-                    try { Thread.sleep(66 - elapsed); } catch (InterruptedException e) {}
-                }
+                if (elapsed < 50) { try { Thread.sleep(50 - elapsed); } catch (Exception e) {} }
             }
         } catch (Exception e) {
-            log.error("摄像头采集异常", e);
+            log.error("采集异常", e);
         } finally {
             if (webcam != null) webcam.close();
         }
     }
 
-    // --- 接收端：接收并显示 (逻辑不变) ---
     private void receiveAndPlay() {
         try {
-            byte[] buffer = new byte[65535]; // UDP 最大包
+            byte[] buffer = new byte[65535];
             DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
-
             while (running) {
-                try {
-                    socket.receive(packet);
-
-                    // 提取数据
-                    byte[] validData = new byte[packet.getLength()];
-                    System.arraycopy(packet.getData(), 0, validData, 0, packet.getLength());
-
-                    // 转为 JavaFX Image
-                    ByteArrayInputStream bais = new ByteArrayInputStream(validData);
-                    Image image = new Image(bais);
-
-                    // 回调显示
-                    if (frameCallback != null) {
-                        Platform.runLater(() -> frameCallback.accept(image));
-                    }
-
-                } catch (SocketException e) {
-                    break;
-                } catch (Exception e) {
-                    log.warn("帧解码失败", e);
+                socket.receive(packet);
+                byte[] validData = new byte[packet.getLength()];
+                System.arraycopy(packet.getData(), 0, validData, 0, packet.getLength());
+                Image image = new Image(new ByteArrayInputStream(validData));
+                if (frameCallback != null) {
+                    Platform.runLater(() -> frameCallback.accept(image));
                 }
             }
         } catch (Exception e) {
-            log.error("视频接收异常", e);
+            if (running) log.error("接收异常", e);
         }
     }
 }
