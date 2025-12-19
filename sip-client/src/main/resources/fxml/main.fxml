@@ -65,11 +65,30 @@
 
             <!-- 输入区域 -->
             <VBox style="-fx-background-color: #f8f9fa; -fx-padding: 15; -fx-border-color: #dee2e6; -fx-border-width: 1 0 0 0;" spacing="10">
-                <HBox spacing="10" alignment="CENTER_LEFT">
+                <HBox spacing="8" alignment="CENTER_LEFT">
                     <Button text="😀" onAction="#handleShowEmoji"
-                           styleClass="icon-button" style="-fx-font-size: 20px;"/>
+                           styleClass="icon-button" style="-fx-font-size: 18px;">
+                        <tooltip><Tooltip text="表情"/></tooltip>
+                    </Button>
+                    <Button text="📷" onAction="#handleAttachImage"
+                           styleClass="icon-button" style="-fx-font-size: 18px;">
+                        <tooltip><Tooltip text="发送图片"/></tooltip>
+                    </Button>
+                    <Button text="🎤" onAction="#handleRecordAudio"
+                           styleClass="icon-button" style="-fx-font-size: 18px;">
+                        <tooltip><Tooltip text="发送语音"/></tooltip>
+                    </Button>
+                    <Button text="🎬" onAction="#handleAttachVideo"
+                           styleClass="icon-button" style="-fx-font-size: 18px;">
+                        <tooltip><Tooltip text="发送视频"/></tooltip>
+                    </Button>
                     <Button text="📎" onAction="#handleAttachFile"
-                           styleClass="icon-button" style="-fx-font-size: 18px;"/>
+                           styleClass="icon-button" style="-fx-font-size: 18px;">
+                        <tooltip><Tooltip text="发送文件"/></tooltip>
+                    </Button>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <ProgressBar fx:id="sendProgressBar" prefWidth="150" visible="false"/>
+                    <Label fx:id="sendProgressLabel" text="" style="-fx-font-size: 11px; -fx-text-fill: #666;"/>
                 </HBox>
                 <TextArea fx:id="messageInput" promptText="输入消息... (Shift+Enter 换行, Enter 发送)"
                          wrapText="true" prefRowCount="3"
