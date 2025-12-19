@@ -163,9 +163,9 @@ public class MainController {
                         FileMessageData fileData = fileTransferService.parseFileMessage(body);
                         if (fileData != null) {
                             try {
-                                // 解码并保存文件
-                                statusLabel.setText("正在接收文件: " + fileData.getFileName());
-                                File savedFile = fileTransferService.decodeAndSave(
+                                // 下载文件 (Base64Data字段现在存储的是下载URL)
+                                statusLabel.setText("正在下载文件: " + fileData.getFileName());
+                                File savedFile = fileTransferService.downloadFile(
                                         fileData.getBase64Data(), fileData.getFileName());
 
                                 // 创建文件消息

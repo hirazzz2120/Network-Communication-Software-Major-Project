@@ -3,15 +3,17 @@ package com.example.sipclient.file;
 import com.example.sipclient.gui.model.MessageType;
 
 import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Base64;
+import java.nio.file.StandardCopyOption;
 import java.util.function.Consumer;
 
 /**
  * 文件传输服务
- * 处理文件编码、解码和传输
+ * 通过HTTP上传文件到服务器，通过SIP发送下载链接
  */
 public class FileTransferService {
 
@@ -21,11 +23,14 @@ public class FileTransferService {
     // 文件消息前缀
     private static final String FILE_MESSAGE_PREFIX = "FILE:";
 
+    // 服务器地址
+    private String serverUrl = "http://localhost:8081";
+
     // 文件大小限制 (字节)
-    public static final long MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
-    public static final long MAX_AUDIO_SIZE = 1 * 1024 * 1024; // 1MB (约1分钟)
-    public static final long MAX_VIDEO_SIZE = 5 * 1024 * 1024; // 5MB
-    public static final long MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    public static final long MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+    public static final long MAX_AUDIO_SIZE = 5 * 1024 * 1024; // 5MB
+    public static final long MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB
+    public static final long MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
     private Consumer<Double> progressCallback;
 
@@ -37,6 +42,10 @@ public class FileTransferService {
         }
     }
 
+    public void setServerUrl(String serverUrl) {
+        this.serverUrl = serverUrl;
+    }
+
     /**
      * 设置进度回调
      */
@@ -45,42 +54,117 @@ public class FileTransferService {
     }
 
     /**
-     * 将文件编码为Base64用于SIP MESSAGE传输
+     * 上传文件到服务器
+     * 
+     * @return 下载URL
      */
-    public String encodeFile(File file) throws IOException {
-        byte[] fileBytes = Files.readAllBytes(file.toPath());
-        return Base64.getEncoder().encodeToString(fileBytes);
-    }
+    public String uploadFile(File file, MessageType type) throws IOException {
+        String uploadUrl = serverUrl + "/api/files/upload";
+        String boundary = "===" + System.currentTimeMillis() + "===";
 
-    /**
-     * 从Base64解码保存文件
-     */
-    public File decodeAndSave(String base64Data, String fileName) throws IOException {
-        byte[] fileBytes = Base64.getDecoder().decode(base64Data);
+        HttpURLConnection connection = (HttpURLConnection) new URL(uploadUrl).openConnection();
+        connection.setDoOutput(true);
+        connection.setDoInput(true);
+        connection.setRequestMethod("POST");
+        connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+        connection.setRequestProperty("Accept", "application/json");
 
-        // 确保文件名唯一
-        String uniqueFileName = System.currentTimeMillis() + "_" + fileName;
-        Path filePath = Paths.get(RECEIVED_FILES_DIR, uniqueFileName);
+        try (OutputStream outputStream = connection.getOutputStream();
+                PrintWriter writer = new PrintWriter(new OutputStreamWriter(outputStream, "UTF-8"), true)) {
 
-        // 写入文件并报告进度
-        try (FileOutputStream fos = new FileOutputStream(filePath.toFile())) {
-            int totalLength = fileBytes.length;
-            int chunkSize = 8192;
-            int written = 0;
+            // 添加type参数
+            writer.append("--").append(boundary).append("\r\n");
+            writer.append("Content-Disposition: form-data; name=\"type\"\r\n\r\n");
+            writer.append(type.getValue()).append("\r\n");
 
-            while (written < totalLength) {
-                int remaining = totalLength - written;
-                int toWrite = Math.min(chunkSize, remaining);
-                fos.write(fileBytes, written, toWrite);
-                written += toWrite;
+            // 添加文件
+            writer.append("--").append(boundary).append("\r\n");
+            writer.append("Content-Disposition: form-data; name=\"file\"; filename=\"")
+                    .append(file.getName()).append("\"\r\n");
+            writer.append("Content-Type: ").append(getContentType(file)).append("\r\n\r\n");
+            writer.flush();
 
-                if (progressCallback != null) {
-                    progressCallback.accept((double) written / totalLength);
+            // 写入文件内容并报告进度
+            try (FileInputStream inputStream = new FileInputStream(file)) {
+                byte[] buffer = new byte[8192];
+                int bytesRead;
+                long totalRead = 0;
+                long fileSize = file.length();
+
+                while ((bytesRead = inputStream.read(buffer)) != -1) {
+                    outputStream.write(buffer, 0, bytesRead);
+                    totalRead += bytesRead;
+
+                    if (progressCallback != null) {
+                        progressCallback.accept((double) totalRead / fileSize * 0.8); // 80% for upload
+                    }
+                }
+            }
+
+            writer.append("\r\n");
+            writer.append("--").append(boundary).append("--\r\n");
+            writer.flush();
+        }
+
+        // 读取响应
+        int responseCode = connection.getResponseCode();
+        if (responseCode == HttpURLConnection.HTTP_OK) {
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(connection.getInputStream()))) {
+                StringBuilder response = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    response.append(line);
+                }
+
+                // 简单解析JSON获取downloadUrl
+                String responseStr = response.toString();
+                int urlStart = responseStr.indexOf("\"downloadUrl\":\"") + 15;
+                int urlEnd = responseStr.indexOf("\"", urlStart);
+                if (urlStart > 14 && urlEnd > urlStart) {
+                    String downloadUrl = responseStr.substring(urlStart, urlEnd);
+                    if (progressCallback != null) {
+                        progressCallback.accept(1.0);
+                    }
+                    return downloadUrl;
                 }
             }
         }
 
-        return filePath.toFile();
+        // 读取错误信息
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(connection.getErrorStream()))) {
+            StringBuilder error = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                error.append(line);
+            }
+            throw new IOException("上传失败 (" + responseCode + "): " + error);
+        }
+    }
+
+    /**
+     * 从URL下载文件
+     */
+    public File downloadFile(String downloadUrl, String fileName) throws IOException {
+        URL url = new URL(downloadUrl);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("GET");
+
+        int responseCode = connection.getResponseCode();
+        if (responseCode == HttpURLConnection.HTTP_OK) {
+            // 确保文件名唯一
+            String uniqueFileName = System.currentTimeMillis() + "_" + fileName;
+            Path filePath = Paths.get(RECEIVED_FILES_DIR, uniqueFileName);
+
+            try (InputStream inputStream = connection.getInputStream()) {
+                Files.copy(inputStream, filePath, StandardCopyOption.REPLACE_EXISTING);
+            }
+
+            return filePath.toFile();
+        } else {
+            throw new IOException("下载失败: HTTP " + responseCode);
+        }
     }
 
     /**
@@ -92,7 +176,7 @@ public class FileTransferService {
 
     /**
      * 解析文件消息内容
-     * 格式: FILE:type:filename:size:base64data
+     * 格式: FILE:type:filename:size:downloadUrl
      */
     public FileMessageData parseFileMessage(String messageContent) {
         if (!isFileMessage(messageContent)) {
@@ -103,7 +187,7 @@ public class FileTransferService {
             // 移除前缀
             String content = messageContent.substring(FILE_MESSAGE_PREFIX.length());
 
-            // 分割: type:filename:size:base64data
+            // 分割: type:filename:size:downloadUrl
             int firstColon = content.indexOf(':');
             int secondColon = content.indexOf(':', firstColon + 1);
             int thirdColon = content.indexOf(':', secondColon + 1);
@@ -115,13 +199,13 @@ public class FileTransferService {
             String typeStr = content.substring(0, firstColon);
             String fileName = content.substring(firstColon + 1, secondColon);
             String sizeStr = content.substring(secondColon + 1, thirdColon);
-            String base64Data = content.substring(thirdColon + 1);
+            String downloadUrl = content.substring(thirdColon + 1);
 
             FileMessageData data = new FileMessageData();
             data.setType(MessageType.fromValue(typeStr));
             data.setFileName(fileName);
             data.setFileSize(Long.parseLong(sizeStr));
-            data.setBase64Data(base64Data);
+            data.setBase64Data(downloadUrl); // 复用此字段存储下载URL
 
             return data;
         } catch (Exception e) {
@@ -131,8 +215,8 @@ public class FileTransferService {
     }
 
     /**
-     * 构建文件消息内容
-     * 格式: FILE:type:filename:size:base64data
+     * 构建文件消息内容（使用HTTP上传）
+     * 格式: FILE:type:filename:size:downloadUrl
      */
     public String buildFileMessage(MessageType type, File file) throws IOException {
         // 检查文件大小限制
@@ -144,34 +228,15 @@ public class FileTransferService {
                     ", 当前文件: " + formatSize(fileSize));
         }
 
-        String base64Data = encodeFile(file);
+        // 上传文件获取下载URL
+        String downloadUrl = uploadFile(file, type);
 
         return String.format("%s%s:%s:%d:%s",
                 FILE_MESSAGE_PREFIX,
                 type.getValue(),
                 file.getName(),
                 fileSize,
-                base64Data);
-    }
-
-    /**
-     * 带进度回调的文件编码
-     */
-    public String encodeFileWithProgress(File file, Consumer<Double> progress) throws IOException {
-        byte[] fileBytes = Files.readAllBytes(file.toPath());
-
-        // 模拟进度（Base64编码很快，主要是读取文件）
-        if (progress != null) {
-            progress.accept(0.5);
-        }
-
-        String encoded = Base64.getEncoder().encodeToString(fileBytes);
-
-        if (progress != null) {
-            progress.accept(1.0);
-        }
-
-        return encoded;
+                downloadUrl);
     }
 
     /**
@@ -231,5 +296,29 @@ public class FileTransferService {
         }
 
         return MessageType.FILE;
+    }
+
+    /**
+     * 获取文件的Content-Type
+     */
+    private String getContentType(File file) {
+        String name = file.getName().toLowerCase();
+        if (name.endsWith(".jpg") || name.endsWith(".jpeg"))
+            return "image/jpeg";
+        if (name.endsWith(".png"))
+            return "image/png";
+        if (name.endsWith(".gif"))
+            return "image/gif";
+        if (name.endsWith(".mp4"))
+            return "video/mp4";
+        if (name.endsWith(".avi"))
+            return "video/x-msvideo";
+        if (name.endsWith(".mov"))
+            return "video/quicktime";
+        if (name.endsWith(".wav"))
+            return "audio/wav";
+        if (name.endsWith(".mp3"))
+            return "audio/mpeg";
+        return "application/octet-stream";
     }
 }
