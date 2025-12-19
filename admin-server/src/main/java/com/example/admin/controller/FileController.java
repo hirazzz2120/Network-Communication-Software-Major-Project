@@ -63,9 +63,8 @@ public class FileController {
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
             // 构建下载URL
-            String downloadUrl = String.format("http://localhost:%d/api/files/download/%s",
+            String downloadUrl = String.format("http://10.29.133.174:%d/api/files/download/%s",
                     serverPort, uniqueFileName);
-
             // 返回结果
             Map<String, Object> result = new HashMap<>();
             result.put("success", true);
