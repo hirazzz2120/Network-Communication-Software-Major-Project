@@ -34,6 +34,11 @@
         </VBox>
 
         <VBox spacing="8">
+            <Label text="业务服务器地址" style="-fx-font-weight: bold;"/>
+            <TextField fx:id="serverUrlField" promptText="例如: http://10.29.133.174:8081"/>
+        </VBox>
+
+        <VBox spacing="8">
             <Label text="密码" style="-fx-font-weight: bold;"/>
             <PasswordField fx:id="passwordField" promptText="输入密码"/>
         </VBox>

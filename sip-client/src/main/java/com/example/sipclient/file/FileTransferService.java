@@ -24,7 +24,7 @@ public class FileTransferService {
     private static final String FILE_MESSAGE_PREFIX = "FILE:";
 
     // 服务器地址
-    private String serverUrl = "http://10.29.133.174:8081";
+    private String serverUrl = "http://localhost:8081";
 
     // 文件大小限制 (字节)
     public static final long MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB

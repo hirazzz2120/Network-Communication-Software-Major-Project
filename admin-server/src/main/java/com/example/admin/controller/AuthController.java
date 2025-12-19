@@ -4,6 +4,7 @@ import com.example.admin.dto.ApiResponse;
 import com.example.admin.dto.LoginRequest;
 import com.example.admin.dto.LoginResponse;
 import com.example.admin.service.SipService;
+import com.example.admin.service.UserService;
 import com.example.admin.util.JwtUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,11 +14,10 @@ import org.springframework.web.bind.annotation.*;
 /**
  * 认证控制器
  * 处理登录、注销等认证相关请求
- * 修正：移除了服务端的 SIP 注册逻辑，避免与客户端冲突
  */
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "*") // 允许跨域（生产环境应该配置具体域名）
+@CrossOrigin(origins = "*")
 public class AuthController {
 
     private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
@@ -27,6 +27,9 @@ public class AuthController {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Autowired
+    private UserService userService;
 
     /**
      * 用户登录
@@ -45,21 +48,16 @@ public class AuthController {
                 return ApiResponse.error("密码不能为空");
             }
 
-            // 修正：不要在服务端注册 SIP！这会抢占客户端的连接，导致客户端无法接电话。
-            // 这里应该只做数据库验证（如果接入了数据库），或者由 SIP 服务器处理鉴权。
-            // 为了演示，我们假设只要有账号密码就可以生成 Token。
-
-            /* 移除这部分冲突代码
-            SipUserAgent userAgent = sipService.register(
-                    request.getSipUri(),
-                    request.getPassword(),
-                    request.getLocalIp(),
-                    request.getLocalPort()
-            );
-            */
-
-            // 提取显示名（从 SIP URI 中提取用户名部分）
+            // 提取用户名（从 SIP URI 中提取用户名部分）
             String displayName = extractDisplayName(request.getSipUri());
+
+            // 保存或更新用户到数据库
+            try {
+                userService.registerOrUpdate(displayName, request.getPassword(), displayName);
+                logger.info("用户已保存到数据库: {}", displayName);
+            } catch (Exception e) {
+                logger.warn("保存用户到数据库失败: {}", e.getMessage());
+            }
 
             // 生成 JWT Token
             String token = jwtUtil.generateToken(request.getSipUri(), displayName);
@@ -69,10 +67,9 @@ public class AuthController {
                     token,
                     request.getSipUri(),
                     displayName,
-                    jwtUtil.getExpirationSeconds()
-            );
+                    jwtUtil.getExpirationSeconds());
 
-            logger.info("用户登录成功 (Token已生成): {}", request.getSipUri());
+            logger.info("用户登录成功: {}", request.getSipUri());
             return ApiResponse.success(response, "登录成功");
 
         } catch (Exception e) {
@@ -200,18 +197,41 @@ public class AuthController {
         private String displayName;
         private String status;
 
-        public String getUserId() { return userId; }
-        public void setUserId(String userId) { this.userId = userId; }
-        public String getDisplayName() { return displayName; }
-        public void setDisplayName(String displayName) { this.displayName = displayName; }
-        public String getStatus() { return status; }
-        public void setStatus(String status) { this.status = status; }
+        public String getUserId() {
+            return userId;
+        }
+
+        public void setUserId(String userId) {
+            this.userId = userId;
+        }
+
+        public String getDisplayName() {
+            return displayName;
+        }
+
+        public void setDisplayName(String displayName) {
+            this.displayName = displayName;
+        }
+
+        public String getStatus() {
+            return status;
+        }
+
+        public void setStatus(String status) {
+            this.status = status;
+        }
     }
 
     // 内部类：更新状态请求
     public static class UpdateStatusRequest {
         private String status;
-        public String getStatus() { return status; }
-        public void setStatus(String status) { this.status = status; }
+
+        public String getStatus() {
+            return status;
+        }
+
+        public void setStatus(String status) {
+            this.status = status;
+        }
     }
 }

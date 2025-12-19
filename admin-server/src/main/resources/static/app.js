@@ -9,6 +9,7 @@ const metrics = {
 };
 const $users = document.getElementById("users-body");
 const $calls = document.getElementById("calls-body");
+const $messages = document.getElementById("messages-body");
 const $lastUpdated = document.getElementById("last-updated");
 const $refreshBtn = document.getElementById("refresh-btn");
 const supportsEventSource = typeof window.EventSource !== "undefined";
@@ -23,26 +24,43 @@ async function fetchJson(url) {
 }
 
 function renderUsers(users) {
-    if (!users.length) {
-        $users.innerHTML = `<tr><td colspan="3" class="placeholder">No users yet.</td></tr>`;
+    if (!users || !users.length) {
+        $users.innerHTML = `<tr><td colspan="3" class="placeholder">暂无用户</td></tr>`;
         return;
     }
     $users.innerHTML = users.map(user => `
         <tr>
-            <td>${user.username}</td>
-            <td>${user.displayName}</td>
+            <td>${user.username || user.id || '-'}</td>
+            <td>${user.nickname || user.displayName || '-'}</td>
             <td>
-                <span class="status-dot ${user.online ? "status-online" : "status-offline"}">
-                    ${user.online ? "Online" : "Offline"}
+                <span class="status-dot ${user.online || user.isOnline ? "status-online" : "status-offline"}">
+                    ${user.online || user.isOnline ? "在线" : "离线"}
                 </span>
             </td>
         </tr>
     `).join("");
 }
 
+function renderMessages(messages) {
+    if (!messages || !messages.length) {
+        $messages.innerHTML = `<tr><td colspan="4" class="placeholder">暂无消息记录</td></tr>`;
+        return;
+    }
+    // 显示最近 20 条消息
+    const recent = messages.slice(-20).reverse();
+    $messages.innerHTML = recent.map(msg => `
+        <tr>
+            <td>${msg.sender || '-'}</td>
+            <td>${msg.receiver || '-'}</td>
+            <td>${truncate(msg.content, 50)}</td>
+            <td>${formatTime(msg.timestamp)}</td>
+        </tr>
+    `).join("");
+}
+
 function renderCalls(calls) {
-    if (!calls.length) {
-        $calls.innerHTML = `<tr><td colspan="5" class="placeholder">No call history.</td></tr>`;
+    if (!calls || !calls.length) {
+        $calls.innerHTML = `<tr><td colspan="5" class="placeholder">暂无通话记录</td></tr>`;
         return;
     }
     $calls.innerHTML = calls.map(call => `
@@ -50,8 +68,8 @@ function renderCalls(calls) {
             <td>${call.id}</td>
             <td>${call.caller}</td>
             <td>${call.callee}</td>
-            <td>${call.status}</td>
-            <td>${formatTime(call.startedAt)}</td>
+            <td>${call.duration || '-'}</td>
+            <td>${formatTime(call.startTime || call.startedAt)}</td>
         </tr>
     `).join("");
 }
@@ -63,12 +81,18 @@ function renderStats(stats) {
     metrics.messages.textContent = stats?.messagesToday ?? 0;
 }
 
-function formatTime(iso) {
-    const date = new Date(iso);
+function formatTime(timeStr) {
+    if (!timeStr) return "N/A";
+    const date = new Date(timeStr);
     if (Number.isNaN(date.getTime())) {
-        return "N/A";
+        return timeStr;
     }
-    return date.toLocaleString();
+    return date.toLocaleString('zh-CN');
+}
+
+function truncate(str, len) {
+    if (!str) return '-';
+    return str.length > len ? str.substring(0, len) + '...' : str;
 }
 
 function showError(targetBody, message) {
@@ -81,10 +105,11 @@ function applySnapshot(snapshot) {
     }
     renderStats(snapshot.stats);
     renderUsers(snapshot.users ?? []);
+    renderMessages(snapshot.messages ?? []);
     renderCalls(snapshot.calls ?? []);
-    const message = snapshot.generatedAt
-        ? `Live at ${formatTime(snapshot.generatedAt)}`
-        : `Updated ${new Date().toLocaleTimeString()}`;
+    const message = snapshot.timestamp
+        ? `更新于 ${formatTime(snapshot.timestamp)}`
+        : `更新于 ${new Date().toLocaleTimeString('zh-CN')}`;
     $lastUpdated.textContent = message;
 }
 
@@ -96,9 +121,10 @@ async function refreshAll() {
     } catch (error) {
         console.error(error);
         renderStats({totalUsers: 0, onlineUsers: 0, activeCalls: 0, messagesToday: 0});
-        $lastUpdated.textContent = "Failed to refresh";
-        showError($users, "Unable to load users.");
-        showError($calls, "Unable to load calls.");
+        $lastUpdated.textContent = "刷新失败";
+        showError($users, "无法加载用户");
+        showError($messages, "无法加载消息");
+        showError($calls, "无法加载通话记录");
     } finally {
         setLoading(false);
     }
@@ -106,7 +132,7 @@ async function refreshAll() {
 
 function setLoading(isLoading) {
     $refreshBtn.disabled = isLoading;
-    $refreshBtn.textContent = isLoading ? "Refreshing..." : "Refresh Data";
+    $refreshBtn.textContent = isLoading ? "刷新中..." : "刷新数据";
 }
 
 function beginStream() {
@@ -122,7 +148,7 @@ function beginStream() {
         applySnapshot(snapshot);
     });
     stream.onerror = () => {
-        $lastUpdated.textContent = "Live stream disconnected. Reconnecting...";
+        $lastUpdated.textContent = "实时连接断开，正在重连...";
         stream.close();
         setTimeout(beginStream, STREAM_RETRY_MS);
     };

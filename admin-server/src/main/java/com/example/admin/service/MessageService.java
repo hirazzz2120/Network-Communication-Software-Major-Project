@@ -30,4 +30,9 @@ public class MessageService {
     public List<Message> getChatHistory(String user1, String user2) {
         return messageRepository.findChatHistory(user1, user2);
     }
+
+    // 获取所有消息（Dashboard 用）
+    public List<Message> listAll() {
+        return messageRepository.findAll();
+    }
 }

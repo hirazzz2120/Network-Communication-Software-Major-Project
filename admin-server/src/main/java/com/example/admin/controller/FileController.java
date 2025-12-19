@@ -8,6 +8,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -29,9 +30,6 @@ public class FileController {
 
     @Value("${file.upload-dir:uploads}")
     private String uploadDir;
-
-    @Value("${server.port:8081}")
-    private int serverPort;
 
     /**
      * 上传文件
@@ -63,8 +61,10 @@ public class FileController {
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
             // 构建下载URL
-            String downloadUrl = String.format("http://10.29.133.174:%d/api/files/download/%s",
-                    serverPort, uniqueFileName);
+            String downloadUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
+                    .path("/api/files/download/")
+                    .path(uniqueFileName)
+                    .toUriString();
             // 返回结果
             Map<String, Object> result = new HashMap<>();
             result.put("success", true);

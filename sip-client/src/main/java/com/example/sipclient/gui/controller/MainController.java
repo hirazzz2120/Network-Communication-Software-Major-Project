@@ -1,5 +1,6 @@
 package com.example.sipclient.gui.controller;
 
+import com.example.sipclient.api.AdminServerClient;
 import com.example.sipclient.call.CallManager;
 import com.example.sipclient.chat.MessageHandler;
 import com.example.sipclient.file.AudioRecorderDialog;
@@ -73,6 +74,8 @@ public class MainController {
     private ObservableList<Contact> allContacts;
     private LocalDatabase database;
     private FileTransferService fileTransferService;
+    private AdminServerClient adminClient; // Admin Server 客户端
+    private String currentUserSipUri; // 当前用户 SIP URI
 
     @FXML
     public void initialize() {
@@ -131,6 +134,33 @@ public class MainController {
         });
 
         statusLabel.setText("就绪");
+    }
+
+    /**
+     * 设置 Admin Server 客户端
+     */
+    public void setAdminClient(AdminServerClient client) {
+        this.adminClient = client;
+    }
+
+    /**
+     * 设置当前用户 SIP URI（用于消息记录）
+     */
+    public void setCurrentUserSipUri(String sipUri) {
+        this.currentUserSipUri = sipUri;
+    }
+
+    /**
+     * 设置业务服务器地址（用于文件上传与后台同步）
+     */
+    public void setServerUrl(String serverUrl) {
+        if (serverUrl == null || serverUrl.isBlank()) {
+            return;
+        }
+        fileTransferService.setServerUrl(serverUrl);
+        if (adminClient != null) {
+            adminClient.setServerUrl(serverUrl);
+        }
     }
 
     public void setUserAgent(SipUserAgent userAgent) {
@@ -286,6 +316,14 @@ public class MainController {
             if (SettingsController.isHistorySaveEnabled()) {
                 database.saveMessage(currentContact.getUserId(), msg);
                 database.saveContact(currentContact);
+            }
+
+            // 同步到 admin-server（异步）
+            if (adminClient != null) {
+                final String sender = currentUserSipUri;
+                final String receiver = currentContact.getSipUri();
+                final String content = text;
+                new Thread(() -> adminClient.recordMessage(sender, receiver, content)).start();
             }
 
             displayMessage(msg);
